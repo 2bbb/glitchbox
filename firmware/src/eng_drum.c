@@ -311,12 +311,12 @@ static void drum_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
     dv_run(&L->c, &L->v, mb, y, n);
     if ((drum_mute[(uint32_t)(t - trk) % NPART] >> ((uint32_t)v->s[0] & (DV_NLANE - 1u))) & 1u)
         return;                                          /* (a muted lane rings on unheard) */
-    if (dstr) {                                          /* KIT DSTR: DRV is the destroyer: x2..x8 into the soft
-                                                          * clip, then 0..10 bits off and a 1..4 sample hold */
-        int32_t gd = 8192 + drv * 6 * 4096 / 127, sh = drv * 10 / 127, hold = 1 + drv / 40;
+    if (dstr) {                                          /* KIT DSTR: DRV is the destroyer: x2..x16 into the clip
+                                                          * (hard above 64), then 0..11 bits off, a 1..4 hold */
+        int32_t gd = 8192 + drv * 14 * 4096 / 127, sh = drv * 11 / 127, hold = 1 + drv / 32;
         int32_t held = L->held, hc = L->hcnt;
-        for (i = 0; i < n; i++) {
-            int32_t s = (softclip((y[i] * gd) >> 12) * 3) >> 2;
+        for (i = 0; i < n; i++) {                        /* (above 64: hard clipped, asymmetric) */
+            int32_t x = (y[i] * gd) >> 12, s = drv < 64 ? (softclip(x) * 3) >> 2 : clamp(x, -18000, 24000);
             if (--hc <= 0) {
                 hc = hold;
                 held = (s >> sh) << sh;
@@ -350,7 +350,7 @@ static int32_t drum_keys(const track_t *t, uint32_t k)
 static const preset_t DRUM_PRESETS[] = {
     {"DRUM KIT", DRUM_KIT_E, {0, 100, 127, 100}, 0, 0, FX(0, 0, 0, 20), PAT(12)},   /* (core.h: SAMPLE PERC's too) */
     /* Glitchbox: KIT DSTR, crushed and driven, its own beat */
-    {"DESTROY", {DK_DSTR, 60, 76, 70, 80, 110, 0, 72}, {0, 100, 127, 100}, 0, 0, FX(25, 0, 10, 15), PAT(14)},
+    {"DESTROY", {DK_DSTR, 58, 80, 72, 85, 115, 0, 120}, {0, 100, 127, 100}, 0, 0, FX(25, 0, 10, 15), PAT(14)},
 };
 
 static const engine_t ENG_DRUM = {

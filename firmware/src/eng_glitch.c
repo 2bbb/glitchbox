@@ -8,7 +8,12 @@
  * soft clip) -> the trapezoidal SVF low-pass (CUT, RES; RES 127 nearly self-oscillates; the ADSR / ENV DEST / LFO /
  * matrix move CUT as on ANALOG) -> CRSH (sample-and-hold 1..13 samples and 16..2 bits together) -> the micro-stutter
  * -> a DC block. From the filter on the signal runs at half scale (its soft knee: +-32383 at most), as ANALOG's.
- *   WAVE  SAW, SQR, DUAL (two saws 13 cents apart), RING (a saw ring-modulated by a sine at 2.375 x: metal), NOIS
+ *   WAVE  SAW, SQR, DUAL (two saws 13 cents apart), RING (a saw ring-modulated by a sine at 2.375 x: metal), NOIS,
+ *         FAT (two saws +-13 cents and a square an octave below), FM (a sine phase-modulated 1:1, index 2..8 following
+ *         the envelope: a bright bark that closes), FMX (3.5:1, the modulator fed back on itself: clangy, nasty)
+ * The filter is driven as an MS-20's: its band state saturates (the resonance screams instead of whistling), and above
+ * DRV 0 the filtered signal goes through a fuzz again (x1..x6 into the soft clip). CRSH takes bits first (0..63) and
+ * holds samples only above 64 (the rate reduction is what sounds like a toy).
  *
  * The micro-stutter (GLCH, SIZE, PJMP): each voice records its own output into a 3072-sample ring (70 ms) in the
  * part's engine memory. Time runs in segments of SIZE (256..3072 samples, 6..70 ms). At the end of each segment a
@@ -20,8 +25,8 @@
  *
  * Voices: at most 2 (poly), each with its own ring; MONO / LEGATO use the first. The filter state is kept on a
  * retrigger (keep), the ring is not. */
-static const char *const N_GLITCH_WAVE[] = {"SAW", "SQR", "DUAL", "RING", "NOIS"};
-enum { GW_SAW, GW_SQR, GW_DUAL, GW_RING, GW_NOIS };
+static const char *const N_GLITCH_WAVE[] = {"SAW", "SQR", "DUAL", "RING", "NOIS", "FAT", "FM", "FMX"};
+enum { GW_SAW, GW_SQR, GW_DUAL, GW_RING, GW_NOIS, GW_FAT, GW_FM, GW_FMX };
 
 #define GL_POLY 2u
 #define GL_BUF 3072u
@@ -68,6 +73,7 @@ static void glitch_note_on(track_t *t, voice_t *v)
     v->s[3] = 0;                                      /* CRSH: the held sample */
     v->s[4] = 0;                                      /* CRSH: the hold counter */
     v->s[5] = 0;                                      /* DC block, Q8 */
+    v->s[6] = 0;                                      /* FMX feedback */
     if (S) {
         S->filled = 0;
         S->loop = 0;
@@ -121,14 +127,19 @@ static void glitch_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, cons
     const int16_t *p = t->p;
     gl_slot_t *S = gl_slot_of(t, v);
     uint32_t wave = (uint32_t)p[P_E0], i, seg = gl_seg(p[P_E6]);
-    uint32_t ph0 = v->ph[0], ph1 = v->ph[1], inc = m->inc, inc2;
+    uint32_t ph0 = v->ph[0], ph1 = v->ph[1], ph2 = v->ph[2], inc = m->inc, inc2;
     int32_t ic1 = v->s[0], ic2 = v->s[1], nst = v->s[2], held = v->s[3], hc = v->s[4], dc = v->s[5];
-    int32_t drv = p[P_E3], crsh = p[P_E4], g = 4096 + drv * 7 * 4096 / 127;   /* drive Q12: x1..x8 */
-    int32_t hold = 1 + crsh / 10, sh = crsh * 14 / 127;                        /* CRSH: 1..13 samples, 0..14 bits off */
+    int32_t drv = p[P_E3], crsh = p[P_E4], g = 8192 + drv * 30 * 4096 / 127;  /* drive Q12: x2..x32 */
+    int32_t hold = 1 + crsh / 16, sh = crsh * 13 / 127;   /* CRSH: 0..13 bits off and a 1..8 sample hold together */
+    int32_t gp = 8192 + drv * 14 * 4096 / 127;                                 /* the clipper after the filter: x2..x16 */
+    uint32_t fmi = 393216u + (uint32_t)(m->envq15 > 0 ? m->envq15 : 0) * 24u   /* FM index 3..9 by the envelope, */
+                 + (uint32_t)drv * 6192u;                                       /* +0..6 by DRV (Q32 cycles per Q15) */
+    int32_t fb = v->s[6];                             /* FMX: the modulator's last sample (feedback) */
     int glitch = S && p[P_E5] > 0;
     tsvf_t flt;
     tsvf_coef(&flt, (p[P_E1] << 8) + m->cutoff, p[P_E2]);
-    inc2 = wave == GW_RING ? (inc >> 3) * 19u : inc + (inc >> 7);   /* RING 2.375 x, DUAL +13 cents */
+    inc2 = wave == GW_RING ? (inc >> 3) * 19u : wave == GW_FM ? inc : wave == GW_FMX ? (inc >> 1) * 7u
+         : inc + (inc >> 7);                          /* RING 2.375 x, FM 1 x, FMX 3.5 x, DUAL / FAT +13 cents */
     for (i = 0; i < n; i++) {
         int32_t s, y;
         switch (wave) {
@@ -146,17 +157,31 @@ static void glitch_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, cons
             s = (int32_t)(noise32(&nst) >> 17) - 16384;
             s <<= 1;
             break;
+        case GW_FAT:
+            s = ((osc_saw(ph0, inc) + osc_saw(ph1, inc2)) * 3 >> 3) + (osc_pulse(ph2, inc >> 1, 0x80000000u) >> 1);
+            ph2 += inc >> 1;                          /* (the sub square an octave below) */
+            break;
+        case GW_FM:
+        case GW_FMX: {
+            int32_t md = osc_sine(ph1 + (wave == GW_FMX ? (uint32_t)fb * 65536u : 0u));
+            fb = md;
+            s = osc_sine(ph0 + (uint32_t)md * fmi);
+            break;
+        }
         default:
             s = osc_saw(ph0, inc);
             break;
         }
         ph0 += inc;
         ph1 += inc2;
-        if (drv) {                                    /* soft clip, or the folder above 64 */
+        if (drv) {                                    /* asymmetric hard clip (even harmonics), the folder above 64 */
             int32_t x = (clamp(s, -32767, 32767) * (g >> 2)) >> 10;
-            s = drv < 64 ? softclip(x) : softclip(gl_fold(x) + (gl_fold(x) >> 2));
+            if (drv >= 64)
+                x = gl_fold(x) + (gl_fold(x >> 1) >> 1);
+            s = clamp(x, -22000, 32767);
         }
         y = tsvf_lp(&flt, s >> 1, &ic1, &ic2);        /* the filter at half scale, then a soft knee */
+        ic1 = softclip(ic1 >> 2) << 2;                /* MS-20: the band state saturates (+-131000) */
         {
             int32_t a = y < 0 ? -y : y;
             if (a > 16000) {
@@ -164,7 +189,7 @@ static void glitch_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, cons
                 y = y < 0 ? -a : a;
             }
         }
-        s = y;                                        /* (half scale from here: +-32383 at most, no clamp) */
+        s = drv ? clamp((y * (gp >> 4)) >> 8, -26000, 26000) : y;   /* hard clipped after the filter */
         if (crsh) {                                   /* rate and bits */
             if (--hc <= 0) {
                 hc = hold;
@@ -209,33 +234,41 @@ static void glitch_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, cons
     }
     v->ph[0] = ph0;
     v->ph[1] = ph1;
+    v->ph[2] = ph2;
     v->s[0] = ic1;
     v->s[1] = ic2;
     v->s[2] = nst;
     v->s[3] = held;
     v->s[4] = hc;
     v->s[5] = dc;
+    v->s[6] = fb;
 }
 
 /* {WAVE, CUT, RES, DRV, CRSH, GLCH, SIZE, PJMP} */
 static const preset_t GLITCH_PRESETS[] = {
-    {"DESTROYER", {GW_SAW, 70, 100, 90, 30, 70, 40, 60}, {0, 60, 100, 30}, 30, 1, FX(40, 0, 30, 20), PAT(4)},
-    {"FUZZ BASS", {GW_SQR, 50, 60, 110, 0, 0, 64, 0}, {0, 50, 90, 20}, 40, 1, FX(30, 0, 0, 5), PAT(2)},
-    {"BROKEN", {GW_RING, 90, 80, 70, 60, 100, 20, 100}, {0, 70, 80, 40}, 20, 0, FX(0, 0, 40, 30), PAT(13)},
-    {"SCREAM", {GW_DUAL, 60, 120, 80, 20, 40, 60, 30}, {5, 80, 110, 50}, 50, 1, FX(20, 10, 40, 30), PAT(4)},
-    {"NOIZ HIT", {GW_NOIS, 80, 110, 100, 70, 90, 10, 0}, {0, 40, 0, 20}, 60, 0, FX(20, 0, 30, 20), PAT(12)},
-    {"HUM", {GW_DUAL, 40, 90, 60, 10, 20, 127, 20}, {60, 90, 127, 90}, 10, 1, FX(0, 30, 30, 60), PAT(8)},
+    {"DESTROYER", {GW_FAT, 62, 108, 120, 80, 70, 40, 60}, {0, 60, 100, 30}, 40, 1, FX(30, 0, 30, 20), PAT(4)},
+    {"FUZZ BASS", {GW_FAT, 45, 90, 127, 60, 0, 64, 0}, {0, 55, 90, 20}, 45, 1, FX(40, 0, 0, 5), PAT(2)},
+    {"BROKEN", {GW_FMX, 95, 80, 120, 95, 110, 20, 100}, {0, 70, 80, 40}, 20, 0, FX(20, 0, 40, 30), PAT(13)},
+    {"SCREAM", {GW_SAW, 55, 124, 110, 65, 20, 60, 30}, {2, 80, 110, 50}, 55, 1, FX(25, 0, 40, 30), PAT(4)},
+    {"NOIZ HIT", {GW_NOIS, 75, 120, 127, 100, 90, 10, 0}, {0, 60, 20, 30}, 60, 0, FX(30, 0, 30, 20), PAT(12)},
+    {"HUM", {GW_FAT, 40, 105, 105, 70, 20, 127, 20}, {60, 90, 127, 90}, 10, 1, FX(0, 30, 30, 60), PAT(8)},
+    {"NASTY FM", {GW_FMX, 105, 70, 120, 75, 30, 30, 40}, {0, 70, 70, 35}, 15, 1, FX(30, 0, 35, 20), PAT(4)},
+    {"CRUSH LEAD", {GW_FAT, 90, 95, 127, 105, 25, 40, 50}, {0, 70, 100, 40}, 35, 1, FX(35, 10, 40, 25), PAT(4)},
+    {"SQR FUZZ", {GW_SQR, 58, 100, 127, 70, 0, 64, 0}, {0, 50, 100, 20}, 50, 1, FX(45, 0, 0, 10), PAT(2)},
+    {"FM BASS", {GW_FM, 70, 75, 115, 60, 0, 64, 0}, {0, 45, 60, 20}, 30, 1, FX(25, 0, 0, 5), PAT(2)},
+    {"MELTDOWN", {GW_FMX, 80, 115, 127, 120, 60, 30, 80}, {0, 60, 100, 30}, 30, 1, FX(40, 0, 20, 20), PAT(4)},
+    {"RUST SAW", {GW_DUAL, 70, 110, 127, 90, 10, 50, 0}, {0, 60, 100, 30}, 45, 1, FX(40, 0, 20, 20), PAT(2)},
 };
 
 static const engine_t ENG_GLITCH = {
     .name = "GLCH",
     .page_title = {"TONE", "CHOP"},
     .edit = {
-        {"WAVE", F_ENUM, 0, 4, 0, N_GLITCH_WAVE, 0},
+        {"WAVE", F_ENUM, 0, 7, GW_FAT, N_GLITCH_WAVE, 0},
         {"CUT", F_CUTOFF, 0, 127, 80, 0, 0},
-        {"RES", F_PCT, 0, 127, 60, 0, 0},
-        {"DRV", F_PCT, 0, 127, 60, 0, 0},
-        {"CRSH", F_PCT, 0, 127, 0, 0, 0},
+        {"RES", F_PCT, 0, 127, 95, 0, 0},
+        {"DRV", F_PCT, 0, 127, 110, 0, 0},
+        {"CRSH", F_PCT, 0, 127, 70, 0, 0},
         {"GLCH", F_PCT, 0, 127, 40, 0, 0},
         {"SIZE", F_PCT, 0, 127, 48, 0, 0},
         {"PJMP", F_PCT, 0, 127, 0, 0, 0},

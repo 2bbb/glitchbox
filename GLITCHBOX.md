@@ -14,19 +14,19 @@ A harsh voice that chops itself up, with up to 2 voices per track. The signal ru
 |---|---|---|
 | K1 | CUT | Filter cutoff (ENV/LFO/matrix move it, as on ANALOG) |
 | K2 | RES | Resonance; it nearly self-oscillates at 127 |
-| K3 | DRV | 0-63: soft clip up to 4x. 64-127: triangle wavefolder up to 8x |
+| K3 | DRV | Hard clipping, 2x to 32x before the filter and 2x to 16x after it; from 64 up a wavefolder as well. Also deepens FM |
 | K4 | GLCH | Chance per segment that the voice loops a slice of itself |
 
 The EDIT pages add:
 
-- **WAVE**: SAW, SQR, DUAL (two saws, 13 cents apart), RING (saw x sine at 2.375x, metallic) or NOIS.
-- **CRSH**: sample-and-hold plus fewer bits.
+- **WAVE**: SAW, SQR, DUAL (two detuned saws), RING (saw x sine, metallic), NOIS, FAT (two saws + sub square), FM (1:1, index follows the envelope) or FMX (inharmonic FM with feedback).
+- **CRSH**: fewer bits and sample-and-hold together (up to 13 bits off, 8x hold).
 - **SIZE**: the stutter segment length, 6-70 ms.
 - **PJMP**: tape-speed pitch jumps for the loops: +7, -5, +12, -12, +5 and -7 semitones, unlocked in that order as PJMP rises.
 
 Loops can also play reversed (1 in 4) or as 1/2 and 1/4 rolls. The first segment after a note-on always plays clean, so the attack stays intact.
 
-Presets: DESTROYER, FUZZ BASS, BROKEN, SCREAM, NOIZ HIT and HUM.
+Presets: DESTROYER, FUZZ BASS, BROKEN, SCREAM, NOIZ HIT, HUM, NASTY FM, CRUSH LEAD, SQR FUZZ, FM BASS, MELTDOWN and RUST SAW. The defaults are dirty too: FAT wave, DRV 110, CRSH 70, RES 95.
 
 Note: GLITCH took WHEEL's engine slot. Felucca's saved data only has room for 14 engine slots. A Felucca project or preset that used WHEEL will load as GLITCH.
 
