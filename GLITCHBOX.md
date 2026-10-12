@@ -115,12 +115,12 @@ Then open http://localhost:8790: the full panel, playable with mouse, computer k
 
 ### Firmware (needs Docker Desktop + the JieLi toolchain)
 
-See BUILDING.md: `tools/get_toolchain.sh`, the AC79 SDK, then `./build.sh` produces `build/felucca.fwsc`. On Apple Silicon, the Linux x86-64 compiler runs in Docker through Rosetta. `tests/run_tests.sh` is the full suite and needs that build.
+See BUILDING.md: `tools/get_toolchain.sh`, the AC79 SDK, then `./build.sh` produces `build/glitchbox.fwsc`. On Apple Silicon, the Linux x86-64 compiler runs in Docker through Rosetta. `tests/run_tests.sh` is the full suite and needs that build.
 
 ## Flashing safely (once you have an FM-1)
 
 1. Read Felucca's README on installing, and **back up the flash first**.
-2. Install with `tools/fm1_install.py build/felucca.fwsc`, or a local copy of the web installer, from Chrome or Edge.
+2. Install with `tools/fm1_install.py build/glitchbox.fwsc`, or a local copy of the web installer, from Chrome or Edge.
 3. **Do not unplug during an update.** The reverse-engineering notes (AL-255/FM-1-RE) say interrupted writes are not proven safe.
 4. To go back: the installer's "Return to official V15", or M-VAVE's own updater.
 5. Last resort for a unit that stays black: the WL80UBOOT boot mode with a Seeed XIAO RP2040 ("FM-1 Transporter") and the official FM-1.fwsc.

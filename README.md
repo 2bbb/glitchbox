@@ -65,12 +65,12 @@ Then open http://localhost:8790. The host tests run with `tests/quick_tests.sh` 
 ## Building the firmware
 
 The JieLi toolchain is Linux x86-64 only; on a Mac it runs in Docker. See [BUILDING.md](BUILDING.md):
-`tools/get_toolchain.sh`, the AC79 SDK, then `./build.sh` produces `build/felucca.fwsc`.
+`tools/get_toolchain.sh`, the AC79 SDK, then `./build.sh` produces `build/glitchbox.fwsc`.
 
 ## Flashing
 
 1. Back up the flash first (see [FELUCCA.md](FELUCCA.md)).
-2. Install from a terminal with `tools/fm1_install.py build/felucca.fwsc` (FM-1 connected by USB).
+2. Install from a terminal with `tools/fm1_install.py build/glitchbox.fwsc` (FM-1 connected by USB).
 3. Do not unplug during an update.
 4. To go back: the installer's **Return to official V15**, or M-VAVE's own updater.
 
