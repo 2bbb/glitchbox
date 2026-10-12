@@ -67,7 +67,7 @@ The JieLi toolchain is Linux x86-64 only; on a Mac it runs in Docker. See [BUILD
 ## Flashing
 
 1. Back up the flash first (see [FELUCCA.md](FELUCCA.md)).
-2. Install with `tools/fm1_install.py build/felucca.fwsc` from Chrome or Edge's USB access.
+2. Install from a terminal with `tools/fm1_install.py build/felucca.fwsc` (FM-1 connected by USB).
 3. Do not unplug during an update.
 4. To go back: the installer's **Return to official V15**, or M-VAVE's own updater.
 
