@@ -36,10 +36,12 @@
  * source of each lane). */
 #include "drum_voice.c"
 
-enum { DK_STD, DK_HAND, DK_CYM, DK_HCYM, DK_80, DK_10, DK_66, DK_55, DK_77, DK_COUNT };   /* (stored values) */
+enum { DK_STD, DK_HAND, DK_CYM, DK_HCYM, DK_80, DK_10, DK_66, DK_55, DK_77, DK_DSTR, DK_COUNT };   /* (stored values) */
 /* the kit a stored KIT value plays: HAND CYM H+CYM (retired after 1.0.4) -> 66 (a conga on TOM), 10 (a cymbal on
  * BELL), 77 (claves on RIM, a cymbal on BELL) */
-static const uint8_t DK_PLAYS[DK_COUNT] = {DK_STD, DK_66, DK_10, DK_77, DK_80, DK_10, DK_66, DK_55, DK_77};
+static const uint8_t DK_PLAYS[DK_COUNT] = {DK_STD, DK_66, DK_10, DK_77, DK_80, DK_10, DK_66, DK_55, DK_77, DK_DSTR};
+/* a model kit (80 10 66 55 77: drum_voice.c DV_KIT), not STD or DSTR (Glitchbox: STD's pieces, destroyed) */
+static int drum_model_kit(uint32_t kit) { return kit >= DK_80 && kit <= DK_77; }
 static uint32_t drum_kit_plays(int32_t v) { return DK_PLAYS[clamp(v, 0, DK_COUNT - 1)]; }
 /* the model kits' pieces where a lane plays another than its own (the lane's name): 1 TOM -> CONGA, 2 RIM -> CLAVE,
  * 4 BELL -> CYM */
@@ -56,7 +58,8 @@ typedef struct {
     uint8_t owner;               /* the voice playing the lane: index + 1, 0 = none */
     uint8_t role;                /* the drum struck (DVT_*) */
     int8_t st;                   /* its semitones from the designed pitch (the GM map) */
-    uint8_t pad;
+    uint8_t hcnt;                /* KIT DSTR: the crusher's hold counter */
+    int32_t held;                /* KIT DSTR: the crusher's held sample */
 } drum_lane_t;
 
 ENG_MEM_FITS("DRUM", sizeof(drum_lane_t) * DV_NLANE);
@@ -67,7 +70,7 @@ ENG_MEM_FITS("DRUM", sizeof(drum_lane_t) * DV_NLANE);
 static uint8_t drum_mute[NPART];
 
 /* 1..3 named as the kit they play: aliases, never shown or offered (EDITOR_PROTOCOL.md: retired values) */
-static const char *const N_DRUM_KIT[] = {"STD", "66", "10", "77", "80", "10", "66", "55", "77"};
+static const char *const N_DRUM_KIT[] = {"STD", "66", "10", "77", "80", "10", "66", "55", "77", "DSTR"};
 static const char *const N_DRUM_KICK[] = {"PUNCH", "ROUND"};
 
 /* General MIDI notes 35..81 -> the drum (DVT_*; DVT_PUNCH: the kick KICK picks) and semitones from its
@@ -89,7 +92,7 @@ static uint32_t drum_gm(const int16_t *p, uint32_t note, int32_t *st)
     uint32_t n = note >= 35u && note <= 81u ? note : 36u + (note + 120u - 36u) % 12u, t = (uint32_t)DRUM_GM[n - 35u][0];
     uint32_t kit = drum_kit_plays(p[P_E0]);           /* STD, the model kits */
     *st = DRUM_GM[n - 35u][1];
-    if (kit >= DK_80)
+    if (drum_model_kit(kit))
         return DV_KTYPE(kit - DK_80 + 1u, DV_TYPE_LANE[t]);
     return t == DVT_PUNCH && p[P_E6] > 0 ? DVT_ROUND : t;
 }
@@ -111,7 +114,7 @@ static uint32_t drum_lane(uint32_t note)
 static uint32_t drum_swaps(const track_t *t)
 {
     uint32_t kit = drum_kit_plays(t->p[P_E0]);
-    return kit >= DK_80 ? DK_SWAP[kit - DK_80] : 0u;
+    return drum_model_kit(kit) ? DK_SWAP[kit - DK_80] : 0u;
 }
 
 /* the lane's name as the track's KIT plays it (5 characters at most) */
@@ -262,6 +265,7 @@ static void drum_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
     int32_t y[CTL], mb[CTL], acc = clamp(p[P_E5] * v->vel * 4, 0, 65536), drv = p[P_E7], g = 0, mk = 0;   /* acc Q16 */
     int32_t lv = clamp(p[P_LN0 + ((uint32_t)v->s[0] & (DV_NLANE - 1u))], 0, 127);
     uint32_t i, r;
+    int dstr = drum_kit_plays(p[P_E0]) == DK_DSTR;
     vmod_t ml;                                           /* (only its amplitude ramp is read: voice_amp) */
     if (!L)
         return;
@@ -281,6 +285,20 @@ static void drum_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
     k.extra = (uint8_t)clamp(k.extra + p[P_E4] - 64, 0, 127);
     k.accent = (uint8_t)clamp(acc >> 9, 0, 127);         /* (Q16 -> 0..127) */
     k.tune = (int16_t)(L->st * 16 + (p[P_E1] - 64) * 3);   /* +-12 semitones */
+    if (dstr) {                                          /* KIT DSTR: STD's pieces pushed (Glitchbox) */
+        uint32_t lane = (uint32_t)v->s[0] & (DV_NLANE - 1u);
+        if (lane == DV_KICK) {                           /* lower, longer, driven */
+            k.tune = (int16_t)(k.tune - 3 * 16);
+            k.decay = (uint8_t)clamp(k.decay + 18, 0, 127);
+            k.extra = (uint8_t)clamp(k.extra + 50, 0, 127);
+        } else if (lane == DV_SNARE || lane == DV_CLAP) {   /* snappier, brighter */
+            k.extra = (uint8_t)clamp(k.extra + 30, 0, 127);
+            k.tone = (uint8_t)clamp(k.tone + 20, 0, 127);
+        } else if (lane == DV_HATC || lane == DV_HATO) {   /* brighter, more sizzle */
+            k.tone = (uint8_t)clamp(k.tone + 16, 0, 127);
+            k.extra = (uint8_t)clamp(k.extra + 30, 0, 127);
+        }
+    }
     if (((const uint32_t *)&k)[0] != ((const uint32_t *)&L->key)[0] ||
         ((const uint32_t *)&k)[1] != ((const uint32_t *)&L->key)[1]) {
         dv_setup(&L->c, &k);                             /* (a parameter moved) */
@@ -293,6 +311,22 @@ static void drum_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
     dv_run(&L->c, &L->v, mb, y, n);
     if ((drum_mute[(uint32_t)(t - trk) % NPART] >> ((uint32_t)v->s[0] & (DV_NLANE - 1u))) & 1u)
         return;                                          /* (a muted lane rings on unheard) */
+    if (dstr) {                                          /* KIT DSTR: DRV is the destroyer: x2..x8 into the soft
+                                                          * clip, then 0..10 bits off and a 1..4 sample hold */
+        int32_t gd = 8192 + drv * 6 * 4096 / 127, sh = drv * 10 / 127, hold = 1 + drv / 40;
+        int32_t held = L->held, hc = L->hcnt;
+        for (i = 0; i < n; i++) {
+            int32_t s = (softclip((y[i] * gd) >> 12) * 3) >> 2;
+            if (--hc <= 0) {
+                hc = hold;
+                held = (s >> sh) << sh;
+            }
+            out[i] += voice_amp(soft_knee(held, 24000), m, i) << 1;
+        }
+        L->held = held;
+        L->hcnt = (uint8_t)hc;
+        return;
+    }
     if (drv > 0) {                                       /* DRV: x1..x4 into the soft clip, the level kept (Q12) */
         g = 4096 + drv * 3 * 4096 / 127;
         mk = (int32_t)((19661u << 15) / (uint32_t)softclip((19661 * g) >> 12));
@@ -315,6 +349,8 @@ static int32_t drum_keys(const track_t *t, uint32_t k)
 /* {KIT, TUNE, TONE, DECY, SNAP, ACC, KICK, DRV}; every kit suggests the BEAT pattern (GM notes) */
 static const preset_t DRUM_PRESETS[] = {
     {"DRUM KIT", DRUM_KIT_E, {0, 100, 127, 100}, 0, 0, FX(0, 0, 0, 20), PAT(12)},   /* (core.h: SAMPLE PERC's too) */
+    /* Glitchbox: KIT DSTR, crushed and driven, its own beat */
+    {"DESTROY", {DK_DSTR, 60, 76, 70, 80, 110, 0, 72}, {0, 100, 127, 100}, 0, 0, FX(25, 0, 10, 15), PAT(14)},
 };
 
 static const engine_t ENG_DRUM = {

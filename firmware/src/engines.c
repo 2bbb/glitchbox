@@ -27,7 +27,8 @@ static uint8_t eng_mem_owner[NPART];       /* engine index + 1 whose state is in
 #include "eng_sample.c"
 #include "eng_formant.c"
 #include "eng_trio.c"
-#include "eng_wheel.c"
+#include "eng_wheel.c"           /* (WHEEL: kept in the tree, not in ENGINES[]: GLITCH took its slot 7) */
+#include "eng_glitch.c"          /* GLITCH (Glitchbox): engine 7 */
 #include "eng_grain.c"
 #include "eng_phys.c"           /* PHYS: DaisySP physical models (phys_dsp.c, MIT) */
 #include "eng_drum.c"           /* DRUM: the 8-lane kit (drum_voice.c) */
@@ -54,7 +55,7 @@ static const engine_t *const ENGINES[NENGINES] = {
     &ENG_SAMPLE,                 /* 4 */
     &ENG_FORMANT,                /* 5 VOICE (eng_formant.c: "voice" is a sounding note in voice.c) */
     &ENG_TRIO,                   /* 6 */
-    &ENG_WHEEL,                  /* 7 */
+    &ENG_GLITCH,                 /* 7 GLITCH (Glitchbox; was WHEEL) */
     &ENG_GRAIN,                  /* 8 */
     &ENG_PHYS,                   /* 9 (ENGI_PHYS) */
     &ENG_DRUM,                   /* 10 (ENGI_DRUM) */
@@ -117,7 +118,7 @@ static const uint8_t ENGINE_ORDER[NENG_SHOWN] = {
 #if FELUCCA_FM4
     1,                           /* DIGITAL */
 #endif
-    2, 3, 4, 5, 6, 7, 8, 9,      /* PHASE LOFI SAMPLE VOICE TRIO WHEEL GRAIN PHYS */
+    2, 3, 4, 5, 6, 7, 8, 9,      /* PHASE LOFI SAMPLE VOICE TRIO GLITCH GRAIN PHYS */
     11,                          /* NOISE */
 #if FELUCCA_SLICE
     13,                          /* SLICE */
@@ -182,11 +183,19 @@ static const struct {
      * now that the arpeggiator is the track's and a preset no longer switches it on */
     {"ARP", {48, 51, 55, 60, 63, 67, 72, 75, 48, 51, 55, 60, 63, 67, 72, 75},       /* 13 */
      {1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0}},
+    /* Glitchbox: an industrial beat for KIT DSTR (GM: 36 kick, 38 snare, 39 clap, 42 / 46 hats) */
+    {"DESTROY", {36, 42, 42, 36, 38, 42, 36, 46, 36, 36, 42, 36, 38, 39, 42, 38},   /* 14 */
+     {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1}},
 };
 #undef T_
 #define NPATTERNS (sizeof PATTERNS / sizeof PATTERNS[0])
 
-/* the parts at power-on (engine, preset, PATTERNS[n - 1] in the sequencer, 0 = empty: all are): bass, pad, lead, drums */
-static const uint8_t TRK_DEF[NPART][3] = {{0, 4, 0}, {ENGI_FM6, 4, 0}, {3, 0, 0}, {ENGI_DRUM, 0, 0}}; /* ANALOG ACID,
-                                                                       * FM6 PAD (was DIGITAL PAD), LOFI PULSE LD, DRUM KIT */
+/* the parts at power-on (engine, preset, PATTERNS[n - 1] in the sequencer, 0 = empty: all are). Glitchbox: GLITCH
+ * DESTROYER (lead), FUZZ BASS, HUM (drone), DRUM DESTROY (KIT DSTR); every sequencer empty, to be played in live */
+#define ENGI_GLITCH 7u
+#if GLITCHBOX_DEFAULTS
+static const uint8_t TRK_DEF[NPART][3] = {{ENGI_GLITCH, 0, 0}, {ENGI_GLITCH, 1, 0}, {ENGI_GLITCH, 5, 0}, {ENGI_DRUM, 1, 0}};
+#else                                                                  /* Felucca's: ANALOG ACID, FM6 PAD, LOFI PULSE LD, */
+static const uint8_t TRK_DEF[NPART][3] = {{0, 4, 0}, {ENGI_FM6, 4, 0}, {3, 0, 0}, {ENGI_DRUM, 0, 0}};   /* DRUM KIT */
+#endif
 static uint32_t trk_def_engine(uint32_t i) { return TRK_DEF[i % NPART][0]; }

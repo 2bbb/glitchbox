@@ -594,8 +594,8 @@ static int demos(const char *dir)
         fclose(f);
         n++;
     }
-    /* AT -> WHEEL DRV: an organ chord, channel aftertouch pushes the drive up and down */
-    e = eng_by_name("WHEEL");
+    /* AT -> GLITCH DRV (Glitchbox: WHEEL's slot): a chord, channel aftertouch pushes the drive up and down */
+    e = eng_by_name("GLCH");
     fresh(e, 0);
     slot(t, 0, MS_AT, MD_E1 + (int32_t)edit_by_label(e, "DRV", 6), 63);
     slot(t, 1, MS_AT, MD_CUT, 20);

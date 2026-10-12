@@ -3191,11 +3191,11 @@ static int test_layer(void)
     key_up(white(9)); key_down(white(10)); frame();
     ok &= perf_held == PF_BIT(PF_FLG) && (kb_layer >> white(10)) & 1u && !gates();   /* (1.2: B4 FLANGER, C5 PHASER) */
     key_up(white(10)); key_down(white(12)); frame();
-    ok &= perf_held == PF_BIT(PF_RTHR) && (kb_layer >> white(12)) & 1u && !gates();   /* (1.5.1: D5 REV THROW) */
+    ok &= perf_held == PF_BIT(PF_CRSW) && (kb_layer >> white(12)) & 1u && !gates();   /* (Glitchbox: D5 CRSH SWP) */
     key_up(white(12)); key_down(white(14)); frame();
-    ok &= !perf_held && (kb_layer >> white(14)) & 1u && !gates();
+    ok &= perf_held == PF_BIT(PF_ROLL) && (kb_layer >> white(14)) & 1u && !gates();   /* (Glitchbox: F5 ROLL) */
     key_up(white(14)); btn_up(B_FX); frame();
-    bad += check("FX + G4 / A4: OCT UP / OCT DN held, silent, no MIDI; KNOB 4 turns; B4 FLANGER, D5 REV THROW, F5 nothing; FX let go: K4 0",
+    bad += check("FX + G4 / A4: OCT UP / OCT DN held, silent, no MIDI; KNOB 4 turns; B4 FLANGER, D5 CRSH SWP, F5 ROLL; FX let go: K4 0",
                  ok && !perf_held && !ui.layer && !perf_k[3] && mo_w == mo);
     /* REVERB > TYPE (FX family, global): ROOM / SPRING / HALL on KNOB 1 (HALL at power-on since 1.2), kept by a
      * project */
@@ -3319,19 +3319,18 @@ static int test_layer(void)
         a = leds_at(0); b2 = leds_at(250);
         k = white(1);
         ok = ((a >> k) & 1u) && ((b2 >> k) & 1u);                    /* held: lit */
-        for (i = 0; i < 14u; i++)                                     /* the other effects (F3 .. E5): breathe */
+        for (i = 0; i < 16u; i++)                                     /* the other effects (F3 .. G5): breathe */
             ok &= i == 1u || ((a ^ b2) >> white(i)) & 1u;
-        for (i = 14; i < 16u; i++)                                    /* F5 G5: no effect, dark */
-            ok &= !((a | b2) >> white(i) & 1u);
         ok &= ((a ^ b2) >> key_at(1, 0)) & 1u && !((a | b2) >> key_at(1, 4) & 1u);   /* a mute breathes, a spare black dark */
         song.g[G_BPM] = 72;
         a = leds_at(0); b2 = leds_at(250);
-        ok &= !((a | b2) >> white(0) & 1u) && !((a | b2) >> white(3) & 1u);   /* 1/8, REVERSE: too long at 72 */
+        ok &= !((a | b2) >> white(0) & 1u) && !((a | b2) >> white(3) & 1u) &&   /* 1/8, REVERSE, ROLL (a 1/8 first): */
+              !((a | b2) >> white(14) & 1u);                                      /* too long at 72 */
         ok &= ((a ^ b2) >> white(2)) & 1u;                            /* 1/32 still blinks */
         song.g[G_BPM] = 120;
     }
     key_up(white(1)); btn_up(B_FX); frame();
-    bad += check("map LEDs: held lit, the 14 effects breathe (1.5.1: D5 E5 the throws), F5 G5 and a too-long REPEAT dark", ok);
+    bad += check("map LEDs: held lit, the 16 effects breathe (Glitchbox: F5 G5 ROLL RANDOM), a too-long REPEAT / ROLL dark", ok);
     usb.config = 0;
     return bad;
 }
@@ -5016,7 +5015,7 @@ static int test_fm4_retired(void)
                  seen == all && TSEL->eng_req == 0u && eng_step(0, 1) == ENGI_FM6 && eng_step(ENGI_FM6, 1) == 2u &&
                  eng_step(ENGI_FM6, -1) == 0u && eng_step(0, -1) == ENGI_DRUM);
     {   /* the display order (engines.c ENGINE_ORDER): every engine one can pick once; the PRESETS list follows it */
-        static const char *const ORDER[] = {"ANALOG", "FM6", "PHASE", "LOFI", "SAMPLE", "VOICE", "TRIO", "WHEEL", "GRAIN",
+        static const char *const ORDER[] = {"ANALOG", "FM6", "PHASE", "LOFI", "SAMPLE", "VOICE", "TRIO", "GLCH", "GRAIN",
                                             "PHYS", "NOISE", "SLICE", "DRUM"};
         uint32_t last = 0xFFu, r = 0, n = 0;
         ok = NENG_SHOWN == NELEM(ORDER);
@@ -7230,7 +7229,7 @@ static int test_fx_map(void)
     frame();
     for (ok = 1, p = 0; p < PF_KEYS; p++)
         ok &= perf_map[p] == PF_DEF[p];
-    bad += check("FX map: settings of 0 (before 1.2) are the default: 1.1.5's ten keys, B4 FLANGER, C5 PHASER, D5 E5 the throws", ok);
+    bad += check("FX map: settings of 0 are the default: 1.1.5's ten keys, B4 FLANGER, C5 GATE, D5 CRSH SWP, E5 ECHO, F5 ROLL, G5 RANDOM", ok);
     snd = TSEL->preset | (uint32_t)TSEL->eng_req << 8;
     btn_down(B_FX); key_down(b4); frame();
     ok = perf_held == PF_BIT(PF_FLG) && ui.layer == LAYER_FX;
@@ -7240,14 +7239,22 @@ static int test_fx_map(void)
     ok &= perf_map[10] == PF_RTHR && perf_held == PF_BIT(PF_RTHR) && msg_is("B4 REV THROW");
     turn(EN_PRESET, 1); keyboard_block();
     ok &= perf_map[10] == PF_ETHR && perf_held == PF_BIT(PF_ETHR) && msg_is("B4 ECHO THROW");
+    turn(EN_PRESET, 1); keyboard_block();               /* Glitchbox: ROLL, GATE, CRSH SWP, RANDOM after the throws */
+    ok &= perf_map[10] == PF_ROLL && perf_held == PF_BIT(PF_ROLL) && msg_is("B4 ROLL");
+    turn(EN_PRESET, 1); keyboard_block();
+    ok &= perf_map[10] == PF_GATE && perf_held == PF_BIT(PF_GATE) && msg_is("B4 GATE 1/32");
+    turn(EN_PRESET, 1); keyboard_block();
+    ok &= perf_map[10] == PF_CRSW && perf_held == PF_BIT(PF_CRSW) && msg_is("B4 CRUSH SWEEP");
+    turn(EN_PRESET, 1); keyboard_block();
+    ok &= perf_map[10] == PF_RAND && perf_held == PF_BIT(PF_RAND) && msg_is("B4 RANDOM");
     turn(EN_PRESET, 1); keyboard_block();               /* past the last: NONE */
     ok &= perf_map[10] == PF_N && !perf_held && msg_is("B4 NONE") && (kb_layer >> b4) & 1u;
     turn(EN_PRESET, 1); keyboard_block();               /* round: the first */
     ok &= perf_map[10] == PF_R8 && perf_held == PF_BIT(PF_R8);
     turn(EN_PRESET, -1); turn(EN_PRESET, -1); turn(EN_PRESET, -1); turn(EN_PRESET, -1); keyboard_block();
-    ok &= perf_map[10] == PF_PHS && perf_held == PF_BIT(PF_PHS) && lys.rp_dirty;
+    ok &= perf_map[10] == PF_GATE && (perf_held & PF_BIT(PF_GATE)) && lys.rp_dirty;   /* (R8 NONE RAND CRSW GATE) */
     ok &= (TSEL->preset | (uint32_t)TSEL->eng_req << 8) == snd && !gates();
-    bad += check("  FX + B4 held + PRESETS: PHASER, REV THROW, ECHO THROW, NONE, round to REPEAT 1/8 and back, each held at once; no sound load", ok);
+    bad += check("  FX + B4 held + PRESETS: PHASER, the throws, ROLL GATE CRSH SWP RANDOM, NONE, round to REPEAT 1/8 and back; no sound load", ok);
     btn_down(B_EDIT); frame(); btn_up(B_EDIT); frame(); keyboard_block();
     ok = perf_map[10] == PF_FLG && perf_held == PF_BIT(PF_FLG) && msg_is("B4 FLANGER (DEF)") && ui.layer == LAYER_FX;
     bad += check("  EDIT with the key held: its default (FLANGER) back, the layer open", ok);
@@ -7299,9 +7306,9 @@ static int test_fx_map(void)
     ok &= !ui.lock && !perf_held;
     bad += check("  locked (FX double tap): G3 held + PRESETS: REPEAT 1/32; EDIT: 1/16, the lock stays; no key: EDIT closes it", ok);
     {   /* the cells name what the keys hold: G3 "1/8" now, B4 FLNG */
-        ok = str_eq(PF_CELL[perf_map[1]], "1/8") && str_eq(PF_CELL[perf_map[10]], "FLNG") && str_eq(PF_CELL[perf_map[12]], "VERB") &&
-             str_eq(PF_CELL[perf_map[13]], "ECHO") && perf_map[14] == PF_N;
-        bad += check("  the map's cells: G3 1/8 (remapped), B4 FLNG, D5 VERB, E5 ECHO (1.5.1's throws), F5 empty", ok);
+        ok = str_eq(PF_CELL[perf_map[1]], "1/8") && str_eq(PF_CELL[perf_map[10]], "FLNG") && str_eq(PF_CELL[perf_map[12]], "CRSW") &&
+             str_eq(PF_CELL[perf_map[13]], "ECHO") && str_eq(PF_CELL[perf_map[14]], "ROLL") && str_eq(PF_CELL[perf_map[15]], "RAND");
+        bad += check("  the map's cells: G3 1/8 (remapped), B4 FLNG, D5 CRSW, E5 ECHO, F5 ROLL, G5 RAND (Glitchbox)", ok);
     }
     memset(fx_keys, 0, 10);
     frame();

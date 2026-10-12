@@ -393,9 +393,9 @@ static int cc_map_test(void)
         }
     }
     bad += check("every engine's CC74 / CC71 target is a continuous EDIT value (or none)", ok);
-    trk[2].eng_req = trk[2].engine = 7u;               /* WHEEL: no brightness, no resonance */
-    memcpy(before, trk[2].p, sizeof before); queued(0xB2, 74, 3, 1); queued(0xB2, 71, 3, 1);
-    bad += check("CC74 / CC71 on WHEEL: ignored", !memcmp(before, trk[2].p, sizeof before));
+    trk[2].eng_req = trk[2].engine = 7u;               /* GLITCH (Glitchbox, WHEEL's slot): CUT and RES */
+    queued(0xB2, 74, 3, 1); queued(0xB2, 71, 5, 1);
+    bad += check("CC74 / CC71 on GLITCH: CUT / RES", trk[2].p[P_E1] == 3 && trk[2].p[P_E2] == 5);
     memcpy(before, trk[0].p, sizeof before);
     queued(0xB0, 121, 0, 1);
     bad += check("CC121 resets no mapped parameter (RP-015)", !memcmp(before, trk[0].p, sizeof before));
@@ -677,10 +677,10 @@ static int pc_test(void)
                 ok &= k == P_E0 || dr->p[k] == was.p[k];
             last = dr->p[P_E0];
         }
-        ok &= n == 6u && last == d->max;
+        ok &= n == 7u && last == d->max;
         pc(3, DK_COUNT + 2u); frame();
         ok &= dr->p[P_E0] == last;
-        bad += check("  DRUM: 0..5 the six kits (STD 80 10 66 55 77; HAND CYM H+CYM skipped), only KIT; 6.. ignored", ok);
+        bad += check("  DRUM: 0..6 the seven kits (STD 80 10 66 55 77 DSTR; HAND CYM H+CYM skipped), only KIT; 7.. ignored", ok);
     }
 
     /* FM6: its presets, then the bank's voices */

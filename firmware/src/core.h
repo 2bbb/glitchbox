@@ -20,6 +20,10 @@
 #define FELUCCA_FM4 0            /* the DIGITAL engine (eng_digital.c, four-operator FM): kept in the tree, not built
                                   * by default; replaced by FM6, its sounds convert (fm4_convert.c) */
 #endif
+#ifndef GLITCHBOX_DEFAULTS
+#define GLITCHBOX_DEFAULTS 1     /* Glitchbox's power-on: GLITCH / DRUM DESTROY parts (engines.c TRK_DEF), CLICK REC by
+                                  * default (ui.c rp_get); 0 = Felucca's (tests/ui_test.c is written against those) */
+#endif
 #define NENGINES (13 + FELUCCA_SLICE)   /* SLICE (13) comes last: the other engines keep their numbers */
 #define ENGI_DIGITAL 1u          /* reserved without FELUCCA_FM4: never selectable (eng_ok), its sounds load as FM6 */
 #define NENG_SHOWN (NENGINES - !FELUCCA_FM4)   /* the engines one can pick: PRESETS, the EDIT layer, the editor,
