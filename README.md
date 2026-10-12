@@ -10,6 +10,9 @@ beautiful sounds and more about taming a beast.
 Glitchbox is a fork of [Felucca](https://github.com/hugelton/Felucca) v1.5.1 by Hügelton Instruments. Everything
 Felucca does still works; Glitchbox adds a new engine, a drum kit, live effects and dirtier defaults.
 
+**[Try it in your browser](https://erikdevos.github.io/glitchbox/)**, no FM-1 needed: the same firmware compiled to
+WebAssembly, played with mouse, computer keyboard or Web MIDI.
+
 > **Status: experimental.** Glitchbox has only run in the host tests and the browser emulator so far, not yet on a
 > real FM-1. CPU headroom on the device has not been measured. Flash at your own risk and read
 > [Flashing](#flashing) first.
@@ -37,7 +40,7 @@ The full user guide is [GLITCHBOX.md](GLITCHBOX.md). Felucca's own documentation
 
 ## Try it without an FM-1
 
-The browser emulator runs the same firmware compiled to WebAssembly, with the panel on screen (mouse, computer
+Online: https://erikdevos.github.io/glitchbox/ (updated with `sh tools/publish_pages.sh`). To run it locally, the browser emulator runs the same firmware compiled to WebAssembly, with the panel on screen (mouse, computer
 keyboard or Web MIDI). On macOS:
 
 ```bash
