@@ -445,17 +445,18 @@ static void graph_fx(const track_t *t, uint16_t c)
 static void graph_insert(const track_t *t, uint16_t c)
 {
     int32_t x, cy = graph_ht / 2, a = 38 * graph_ht / 100, py = cy, ty = clamp(t->p[P_ITYPE], 0, IT_N - 1);
-    int32_t m = ins_mixq(t->p[P_IMIX]), g = 4096 + t->p[P_IA] * t->p[P_IA] * 3, lvl = LEVEL_Q12[t->p[P_IC] & 127];
+    int32_t m = ins_mixq(t->p[P_IMIX]), g = 4096 + t->p[P_IA] * t->p[P_IA] * (ty == IT_MUFF ? 14 : ty == IT_BASS ? 12 : 3);
+    int32_t lvl = ty == IT_BASS ? 4096 : LEVEL_Q12[t->p[P_IC] & 127];
     uint32_t sh = ins_bits_sh(t->p[P_IA]);
     cv_rect(PANEL_X0, cy, PANEL_W, 1, T_RAISE);
     cv_line(PANEL_X0 + PANEL_W / 2, cy - a, PANEL_X0 + PANEL_W / 2, cy + a, T_RAISE);
-    if (ty == IT_OFF || ty >= IT_PHASER || !m)
+    if (ty == IT_OFF || (ty >= IT_PHASER && ty <= IT_CHORUS) || !m)
         cv_line(PANEL_X0 + PANEL_W / 6, cy + a, PANEL_X0 + PANEL_W * 5 / 6, cy - a, ty ? T_RAISE : T_DIM);
     if (ty == IT_OFF)
         return;
     for (x = 0; x < PANEL_W; x++) {
         int32_t y, w;
-        if (ty >= IT_PHASER) {                       /* the sweep, two cycles */
+        if (ty >= IT_PHASER && ty <= IT_CHORUS) {   /* the sweep, two cycles */
             uint32_t ph = (uint32_t)x * (0xFFFFFFFFu / (PANEL_W / 2u)), tr = pf_tri(ph);
             w = ty == IT_CHORUS ? osc_sine(ph) * 2 : ty == IT_FLANGER ? (int32_t)((tr * tr) >> 16) * 2 - 65536 : (int32_t)tr * 2 - 65536;
             y = cy - (w >> 1) * a / 32768 * t->p[P_IB] / 127;

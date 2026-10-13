@@ -25,14 +25,36 @@
  *
  * Voices: at most 2 (poly), each with its own ring; MONO / LEGATO use the first. The filter state is kept on a
  * retrigger (keep), the ring is not. */
-static const char *const N_GLITCH_WAVE[] = {"SAW", "SQR", "DUAL", "RING", "NOIS", "FAT", "FM", "FMX"};
-enum { GW_SAW, GW_SQR, GW_DUAL, GW_RING, GW_NOIS, GW_FAT, GW_FM, GW_FMX };
+/* THE BASS FAMILY (FUZZ REES 808 GRIT GROW): the same engine, a different voice built to be low and big, not the
+ * chopped lead above. Measured on a 55 Hz note, the lead chain at DRV 127 had no fundamental left (the wavefolder
+ * above DRV 64 scatters a bass into 1 kHz fizz: -47 dB under it), so a "fuzz bass" there was a mid-range buzz. These
+ * waves keep the bottom end by construction:
+ *   osc -> CUT / RES (the SVF, before the fuzz: an acid line squeals into it) -> OCTV (full-wave rectified blend before
+ *   the clip: the octave up) -> FUZZ (a Big-Muff's two stages: up to 56x into a tanh, a coupling high-pass that leaves
+ *   the bass, a second stage with a little asymmetry) -> TONE (the Muff's stack: a low-pass at ~400 Hz against a high-pass
+ *   at ~1.6 kHz; 64 scoops the mids, 0 is all low end, 127 all fizz) -> CRSH (bits, then sample hold above 64) -> + SUB,
+ *   a clean sine at the pitch and one an octave below, AFTER everything, so no fuzz setting can eat it -> a slow DC block
+ *   (11 Hz: it must not touch a 41 Hz bass).
+ *   FUZZ  a saw and a square an octave down        REES  three saws +-7 cents (the beating wall of a reese)
+ *   808   a sine that falls from +24 semitones in 25 ms (a kick that is a bass); the SUB octave stays steady
+ *   GRIT  a saw and noise                          GROW  1:1 FM with feedback, its index follows the envelope
+ * In this family EDIT 6 and 7 are TONE and OCTV (SIZE and PJMP in the lead waves), EDIT 5 is SUB (GLCH: the stutter
+ * is not part of a bass: it would chop the sub) and EDIT 3 is called FUZZ. The lead waves SYNC (a hard-synced saw, its
+ * slave swept by the envelope) and SUPR (three saws +-22 cents: Tron's wall) are in the chopped family. */
+static const char *const N_GLITCH_WAVE[] = {"SAW", "SQR", "DUAL", "RING", "NOIS", "FAT", "FM", "FMX",
+                                            "FUZZ", "REES", "808", "GRIT", "GROW", "SYNC", "SUPR"};
+enum { GW_SAW, GW_SQR, GW_DUAL, GW_RING, GW_NOIS, GW_FAT, GW_FM, GW_FMX,
+       GW_FUZZ, GW_REES, GW_808, GW_GRIT, GW_GROW, GW_SYNC, GW_SUPR };
+#define GL_BASS(w) ((w) >= GW_FUZZ && (w) <= GW_GROW)
 
 #define GL_POLY 2u
 #define GL_BUF 3072u
 #define GL_XF 32                 /* cross-fade, samples */
 typedef struct {
-    int16_t buf[GL_BUF];         /* the voice's output, recorded while it plays live */
+    union {
+        int16_t buf[GL_BUF];     /* the voice's output, recorded while it plays live */
+        int32_t bs[8];           /* the bass family's states in the same bytes (it does not chop): bass_render */
+    };
     uint16_t w;                  /* next write index */
     uint16_t filled;             /* samples recorded since the note-on (to GL_BUF) */
     uint16_t cnt;                /* samples left in the segment */
@@ -74,6 +96,21 @@ static void glitch_note_on(track_t *t, voice_t *v)
     v->s[4] = 0;                                      /* CRSH: the hold counter */
     v->s[5] = 0;                                      /* DC block, Q8 */
     v->s[6] = 0;                                      /* FMX feedback */
+    v->s[7] = 0;                                      /* bass family: the SUB octave's phase */
+    if (GL_BASS(t->p[P_E0])) {                        /* the bass family starts at phase 0 (the sub, the 808's */
+        v->ph[0] = 0;                                 /* sine and the fuzz's fundamental add, not fight) */
+        v->ph[1] = t->p[P_E0] == GW_808 ? 163840u : 0x40000000u;   /* 808: the pitch drop left, Q16 (2.5 x the pitch) */
+        v->ph[2] = 0;
+        if (S) {
+            uint32_t k;
+            for (k = 0; k < 8u; k++)
+                S->bs[k] = 0;
+            S->loop = 0;
+            S->xf = 0;
+            S->filled = 0;
+        }
+        return;
+    }
     if (S) {
         S->filled = 0;
         S->loop = 0;
@@ -122,10 +159,138 @@ static void gl_segment(gl_slot_t *S, const int16_t *p, uint32_t seg)
     }
 }
 
+/* a one-pole low-pass's coefficient for cutoff index c (SVF_G), Q16, as fx.c ins_lpk (that comes later in the build) */
+static int32_t bs_lpk(int32_t c)
+{
+    uint32_t g = SVF_G[clamp(c, 0, 127)];
+    return (int32_t)((g << 16) / (4096u + g));
+}
+
+/* the bass family (see the top). States in S->bs: 0 the coupling high-pass, 1 2 the tone stack's two low-passes (x16),
+ * 3 the octave's rectifier average (Q8); the voice's: s[0] s[1] the SVF, s[2] noise, s[3] s[4] CRSH, s[5] the DC block
+ * (Q10), s[6] GROW's feedback, s[7] the SUB octave's phase; ph[1] of the 808 its pitch drop left */
+static void bass_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vmod_t *m)
+{
+    const int16_t *p = t->p;
+    gl_slot_t *S = gl_slot_of(t, v);
+    uint32_t wave = (uint32_t)p[P_E0], i, ph0 = v->ph[0], ph1 = v->ph[1], ph2 = v->ph[2], inc = m->inc, inc2, inc3;
+    uint32_t sph = (uint32_t)v->s[7];
+    int32_t ic1 = v->s[0], ic2 = v->s[1], nst = v->s[2], held = v->s[3], hc = v->s[4], dc = v->s[5], fb = v->s[6];
+    int32_t fz = p[P_E3], crsh = p[P_E4], sub = p[P_E5], tone = p[P_E6], octv = p[P_E7];
+    int32_t g1 = 4096 + fz * fz * 14, hold = 1 + crsh / 16, sh = crsh * 13 / 127, subg = sub * 40;
+    int32_t ka = bs_lpk(52), kb = bs_lpk(80), b0 = softclip(2400);
+    uint32_t fmi = 393216u + (uint32_t)(m->envq15 > 0 ? m->envq15 : 0) * 24u;
+    tsvf_t flt;
+    if (!S)
+        return;
+    tsvf_coef(&flt, (p[P_E1] << 8) + m->cutoff, p[P_E2]);
+    inc2 = inc + (inc >> 7);                              /* REES: +-0.78 % = +-13 cents ... */
+    inc3 = inc - (inc >> 7);
+    if (wave == GW_REES) {
+        inc2 = inc + (inc >> 8);                          /* ... halved: +-7 cents */
+        inc3 = inc - (inc >> 8);
+    }
+    for (i = 0; i < n; i++) {
+        int32_t s, y, u, x16, o1, o2, hi, r;
+        uint32_t ie = inc;
+        switch (wave) {
+        case GW_REES:
+            s = (osc_saw(ph0, inc) + osc_saw(ph1, inc2) + osc_saw(ph2, inc3)) * 11 >> 5;
+            ph1 += inc2;
+            ph2 += inc3;
+            break;
+        case GW_808:
+            ie = inc + (inc >> 8) * (ph1 >> 8);           /* the drop: inc x (1 + k), k falling to 0 in ~25 ms */
+            s = osc_sine(ph0);
+            ph1 -= (ph1 >> 10) + (ph1 ? 1u : 0u);
+            break;
+        case GW_GRIT:
+            s = ((osc_saw(ph0, inc) * 5) >> 3) + ((int32_t)(noise32(&nst) >> 17) - 16384);
+            break;
+        case GW_GROW: {
+            int32_t md = osc_sine(ph1 + (uint32_t)fb * 65536u);
+            fb = md;
+            s = osc_sine(ph0 + (uint32_t)md * fmi);
+            ph1 += inc;
+            break;
+        }
+        default:                                          /* FUZZ: a saw and a square an octave down */
+            s = ((osc_saw(ph0, inc) * 5) >> 3) + ((osc_pulse(ph2, inc >> 1, 0x80000000u) * 3) >> 3);
+            ph2 += inc >> 1;
+            break;
+        }
+        ph0 += ie;
+        y = tsvf_lp(&flt, s >> 1, &ic1, &ic2);            /* the filter at half scale ... */
+        ic1 = softclip(ic1 >> 2) << 2;                    /* (the band state saturates: the resonance screams) */
+        y = clamp(y << 1, -65535, 65535);                 /* ... and back */
+        if (octv) {                                       /* OCTV: the rectified signal, its mean taken away */
+            r = y < 0 ? -y : y;
+            S->bs[3] += ((r << 8) - S->bs[3]) >> 10;
+            y += ((r - (S->bs[3] >> 8)) * octv) >> 6;
+            y = clamp(y, -65535, 65535);
+        }
+        u = softclip(((y >> 3) * g1) >> 9);               /* FUZZ: stage 1, 4x .. 56x into a tanh */
+        S->bs[0] += ((u << 8) - S->bs[0]) >> 7;           /* the coupling high-pass, ~55 Hz */
+        u -= S->bs[0] >> 8;
+        u = softclip(u * 2 + 2400) - b0;                  /* stage 2: harder, a little lopsided (even harmonics) */
+        x16 = u << 4;
+        r = mulq16(x16 - S->bs[1], (uint32_t)ka);         /* TONE: a low-pass at ~400 Hz ... */
+        o1 = r + S->bs[1];
+        S->bs[1] = o1 + r;
+        r = mulq16(x16 - S->bs[2], (uint32_t)kb);         /* ... against a high-pass at ~1.6 kHz */
+        o2 = r + S->bs[2];
+        S->bs[2] = o2 + r;
+        hi = x16 - o2;
+        s = ((((o1 * (127 - tone) + hi * tone) >> 7) * 11 >> 4) + 8) >> 4;   /* x0.69: the high-pass rings to 2x */
+        if (crsh) {                                       /* CRSH: bits first, the hold only above 64 */
+            if (--hc <= 0) {
+                hc = hold;
+                held = (s >> sh) << sh;
+            }
+            s = held;
+        }
+        if (subg) {                                       /* SUB: sines at the pitch and an octave down, clean */
+            u = osc_sine(sph);
+            s += ((osc_sine(ph0 - ie) + u) * subg) >> 14;
+            sph += inc >> 1;
+        }
+        s = soft_knee(s, 24000);
+        dc += s - (dc >> 10);                             /* a slow DC block (11 Hz): a 41 Hz bass stays whole */
+        s -= dc >> 10;
+        out[i] += voice_amp(s, m, i) << 1;
+    }
+    v->ph[0] = ph0;
+    v->ph[1] = ph1;
+    v->ph[2] = ph2;
+    v->s[0] = ic1;
+    v->s[1] = ic2;
+    v->s[2] = nst;
+    v->s[3] = held;
+    v->s[4] = hc;
+    v->s[5] = dc;
+    v->s[6] = fb;
+    v->s[7] = (int32_t)sph;
+}
+
+/* EDIT 3 .. 7 of the bass family as the bass family names them (the same ranges and defaults) */
+static const param_desc_t *glitch_desc(const track_t *t, uint32_t k)
+{
+    static const param_desc_t B[8] = {
+        {0}, {0}, {0},
+        {"FUZZ", F_PCT, 0, 127, 110, 0, 0}, {0},
+        {"SUB", F_PCT, 0, 127, 40, 0, 0}, {"TONE", F_PCT, 0, 127, 48, 0, 0}, {"OCTV", F_PCT, 0, 127, 0, 0, 0},
+    };
+    return GL_BASS(t->p[P_E0]) && k >= 3u && k != 4u ? &B[k] : 0;
+}
+
 static void glitch_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vmod_t *m)
 {
     const int16_t *p = t->p;
     gl_slot_t *S = gl_slot_of(t, v);
+    if (GL_BASS(p[P_E0])) {
+        bass_render(t, v, out, n, m);
+        return;
+    }
     uint32_t wave = (uint32_t)p[P_E0], i, seg = gl_seg(p[P_E6]);
     uint32_t ph0 = v->ph[0], ph1 = v->ph[1], ph2 = v->ph[2], inc = m->inc, inc2;
     int32_t ic1 = v->s[0], ic2 = v->s[1], nst = v->s[2], held = v->s[3], hc = v->s[4], dc = v->s[5];
@@ -156,6 +321,18 @@ static void glitch_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, cons
         case GW_NOIS:
             s = (int32_t)(noise32(&nst) >> 17) - 16384;
             s <<= 1;
+            break;
+        case GW_SYNC: {                               /* a hard-synced saw: the slave 1.5x .. 5.5x, swept by the envelope */
+            uint32_t incs = inc + (inc >> 1) + (((inc >> 15) * (uint32_t)(m->envq15 > 0 ? m->envq15 : 0)) << 2);
+            if ((uint32_t)(ph0 + inc) < ph0)
+                ph1 = 0;
+            s = osc_saw(ph1, incs);
+            ph1 += incs;
+            break;
+        }
+        case GW_SUPR:                                 /* three saws +-22 cents */
+            s = (osc_saw(ph0, inc) + osc_saw(ph1, inc + (inc >> 6) / 2 * 1) + osc_saw(ph2, inc - (inc >> 6) / 2 * 1)) * 11 >> 5;
+            ph2 += inc - (inc >> 6) / 2;
             break;
         case GW_FAT:
             s = ((osc_saw(ph0, inc) + osc_saw(ph1, inc2)) * 3 >> 3) + (osc_pulse(ph2, inc >> 1, 0x80000000u) >> 1);
@@ -264,7 +441,7 @@ static const engine_t ENG_GLITCH = {
     .name = "GLCH",
     .page_title = {"TONE", "CHOP"},
     .edit = {
-        {"WAVE", F_ENUM, 0, 7, GW_FAT, N_GLITCH_WAVE, 0},
+        {"WAVE", F_ENUM, 0, 14, GW_FAT, N_GLITCH_WAVE, 0},
         {"CUT", F_CUTOFF, 0, 127, 80, 0, 0},
         {"RES", F_PCT, 0, 127, 95, 0, 0},
         {"DRV", F_PCT, 0, 127, 110, 0, 0},
@@ -277,6 +454,7 @@ static const engine_t ENG_GLITCH = {
     .npresets = NELEM(GLITCH_PRESETS),
     .note_on = glitch_note_on,
     .render = glitch_render,
+    .desc = glitch_desc,
     .knob = {P_E1, P_E2, P_E3, P_E5},
     .poly = GL_POLY,
     .keep = 0x03,                /* the filter */
