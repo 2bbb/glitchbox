@@ -241,7 +241,7 @@ static void bass_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const 
         o2 = r + S->bs[2];
         S->bs[2] = o2 + r;
         hi = x16 - o2;
-        s = ((((o1 * (127 - tone) + hi * tone) >> 7) * 11 >> 4) + 8) >> 4;   /* x0.69: the high-pass rings to 2x */
+        s = ((((o1 * (127 - tone) + hi * tone) >> 7) * 11 >> 3) + 8) >> 4;   /* x1.38 (the leads' level; the high-pass rings to 2x) */
         if (crsh) {                                       /* CRSH: bits first, the hold only above 64 */
             if (--hc <= 0) {
                 hc = hold;
@@ -424,7 +424,7 @@ static void glitch_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, cons
 /* {WAVE, CUT, RES, DRV, CRSH, GLCH, SIZE, PJMP} */
 static const preset_t GLITCH_PRESETS[] = {
     {"DESTROYER", {GW_FAT, 62, 108, 120, 80, 70, 40, 60}, {0, 60, 100, 30}, 40, 1, FX(30, 0, 30, 20), PAT(4)},
-    {"FUZZ BASS", {GW_FAT, 45, 90, 127, 60, 0, 64, 0}, {0, 55, 90, 20}, 45, 1, FX(40, 0, 0, 5), PAT(2)},
+    {"FUZZ BASS", {GW_FUZZ, 62, 70, 120, 20, 60, 40, 0}, {0, 60, 110, 20}, 30, 1, FX(20, 0, 0, 5), PAT(2)},
     {"BROKEN", {GW_FMX, 95, 80, 120, 95, 110, 20, 100}, {0, 70, 80, 40}, 20, 0, FX(20, 0, 40, 30), PAT(13)},
     {"SCREAM", {GW_SAW, 55, 124, 110, 65, 20, 60, 30}, {2, 80, 110, 50}, 55, 1, FX(25, 0, 40, 30), PAT(4)},
     {"NOIZ HIT", {GW_NOIS, 75, 120, 127, 100, 90, 10, 0}, {0, 60, 20, 30}, 60, 0, FX(30, 0, 30, 20), PAT(12)},
@@ -435,6 +435,13 @@ static const preset_t GLITCH_PRESETS[] = {
     {"FM BASS", {GW_FM, 70, 75, 115, 60, 0, 64, 0}, {0, 45, 60, 20}, 30, 1, FX(25, 0, 0, 5), PAT(2)},
     {"MELTDOWN", {GW_FMX, 80, 115, 127, 120, 60, 30, 80}, {0, 60, 100, 30}, 30, 1, FX(40, 0, 20, 20), PAT(4)},
     {"RUST SAW", {GW_DUAL, 70, 110, 127, 90, 10, 50, 0}, {0, 60, 100, 30}, 45, 1, FX(40, 0, 20, 20), PAT(2)},
+    /* the bass family: {WAVE, CUT, RES, FUZZ, CRSH, SUB, TONE, OCTV} */
+    {"REESE", {GW_REES, 58, 75, 100, 30, 50, 55, 20}, {5, 70, 115, 30}, 20, 1, FX(15, 20, 0, 10), PAT(2)},
+    {"808 DIST", {GW_808, 100, 30, 115, 20, 70, 35, 0}, {0, 80, 50, 45}, 0, 1, FX(20, 0, 0, 5), PAT(2)},
+    {"GRIT BASS", {GW_GRIT, 55, 90, 127, 75, 45, 60, 30}, {0, 55, 100, 20}, 35, 1, FX(25, 0, 0, 5), PAT(2)},
+    {"GROWL", {GW_GROW, 78, 85, 110, 40, 75, 72, 40}, {0, 75, 90, 25}, 40, 1, FX(20, 0, 10, 10), PAT(2)},
+    {"ACID FUZZ", {GW_FUZZ, 50, 120, 105, 25, 55, 50, 0}, {0, 45, 60, 20}, 60, 1, FX(20, 0, 20, 10), PAT(2)},
+    {"OCTA SMASH", {GW_FUZZ, 70, 60, 127, 60, 55, 80, 90}, {0, 60, 110, 20}, 25, 1, FX(30, 0, 0, 5), PAT(2)},
 };
 
 static const engine_t ENG_GLITCH = {

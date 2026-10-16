@@ -26,7 +26,7 @@ The EDIT pages add:
 
 Loops can also play reversed (1 in 4) or as 1/2 and 1/4 rolls. The first segment after a note-on always plays clean, so the attack stays intact.
 
-Presets: DESTROYER, FUZZ BASS, BROKEN, SCREAM, NOIZ HIT, HUM, NASTY FM, CRUSH LEAD, SQR FUZZ, FM BASS, MELTDOWN and RUST SAW. The defaults are dirty too: FAT wave, DRV 110, CRSH 70, RES 95.
+Presets: DESTROYER, FUZZ BASS, BROKEN, SCREAM, NOIZ HIT, HUM, NASTY FM, CRUSH LEAD, SQR FUZZ, FM BASS, MELTDOWN and RUST SAW, plus the bass family's FUZZ BASS, REESE, 808 DIST, GRIT BASS, GROWL, ACID FUZZ and OCTA SMASH (waves FUZZ, REES, 808, GRIT and GROW: a Big-Muff-style fuzz that keeps the fundamental, with a clean SUB under it; for these waves EDIT 3/5/6/7 are FUZZ, SUB, TONE and OCTV, and KNOB 4 is SUB). The defaults are dirty too: FAT wave, DRV 110, CRSH 70, RES 95.
 
 Note: GLITCH took WHEEL's engine slot. Felucca's saved data only has room for 14 engine slots. A Felucca project or preset that used WHEEL will load as GLITCH.
 

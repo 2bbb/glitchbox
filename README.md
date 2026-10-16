@@ -24,9 +24,9 @@ WebAssembly, played with mouse, computer keyboard or Web MIDI.
 - **GLCH engine:** oscillator, then hard clipping and a wavefolder, then a screaming resonant filter, then a clipper,
   bitcrusher and a micro-stutter that loops, reverses and pitch-jumps slices of its own sound.
   - Knobs: CUT, RES, DRV, GLCH (how often it chops itself)
-  - Waves: SAW, SQR, DUAL, RING, NOIS, FAT, FM, FMX (inharmonic FM with feedback)
-  - 12 presets: DESTROYER, FUZZ BASS, BROKEN, SCREAM, NOIZ HIT, HUM, NASTY FM, CRUSH LEAD, SQR FUZZ, FM BASS,
-    MELTDOWN, RUST SAW
+  - Waves: SAW, SQR, DUAL, RING, NOIS, FAT, FM, FMX (inharmonic FM with feedback), SYNC, SUPR; bass waves FUZZ, REES, 808, GRIT, GROW
+  - 18 presets: DESTROYER, BROKEN, SCREAM, NOIZ HIT, HUM, NASTY FM, CRUSH LEAD, SQR FUZZ, FM BASS, MELTDOWN,
+    RUST SAW, and the fuzz basses FUZZ BASS, REESE, 808 DIST, GRIT BASS, GROWL, ACID FUZZ, OCTA SMASH
 - **DESTROY drum kit:** 8 synthesised lanes (kick, snare, hats and more), where DRV clips and crushes every hit.
 - **Live FX** (hold FX and press a white key): Felucca's REPEAT, REVERSE, TAPE STOP, FREEZE, filter sweeps and
   more, plus **ROLL** (an accelerating repeat), **GATE**, **CRSH SWP** (crush building over a bar) and **RANDOM**.
