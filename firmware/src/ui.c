@@ -45,6 +45,8 @@ static uint32_t up_gen;                      /* bumped on every user bank change
 #define PREF_LATCH 1u                          /* MENU > FX LATCH ON (#40) */
 #define PREF_ANIM_OFF 2u                       /* MENU > ANIM OFF (#46): values snap (no rolling digits, no glide) */
 #define PREF_ACCEL 4u                          /* MENU > KNOB ACCEL ON (#52): fast turns of wide values x2..x8 */
+/* Glitchbox: KNOB ACCEL is ON by default there, so its stored bit means OFF (GLITCHBOX_DEFAULTS, as CLICK REC) */
+#define accel_on() (((ui_prefs & PREF_ACCEL) != 0u) != (GLITCHBOX_DEFAULTS != 0))
 #define PREF_USB_FIXED 8u                      /* MENU > USB LEVEL FIXED: USB audio at the full level, MASTER after */
 #define PREF_BPM_LOCK 16u                      /* MENU > BPM LOCK ON (#58): SELECT sets the tempo only with GLO held */
 #define PREF_LARGE 32u                         /* MENU > LARGE ON (#15, Discussion #80): big knob labels and values
@@ -1243,6 +1245,7 @@ static void apply_preset_to(track_t *t, uint32_t pi)
         const preset_t *pr = &e->presets[pi];
         for (i = 0; i < 4u; i++)
             t->p[P_DIST + i] = (int16_t)(pr->fx[i] ? pr->fx[i] - 1 : FX_DEF[i]);
+        preset_ins(t->p, pr);                         /* Glitchbox: the preset's INSERT */
     }
     fm6_track_loaded(t);                              /* FM6: the preset's patch (its SLOT) */
     load_end(t);

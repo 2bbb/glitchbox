@@ -57,6 +57,16 @@ a { color: inherit; }
 .dimlo .mid .slit { fill: #8a8a8e; }
 .held .face { stroke: var(--lit); stroke-width: 3; }
 .latched .face { stroke: #79b8ff; stroke-width: 3; }
+.recon .face.btn { fill: #ff453a; stroke: #ff8a80; stroke-width: 7; filter: drop-shadow(0 0 8px #ff453a);
+                   animation: rec-pulse 1s ease-in-out infinite; }
+.recon text { fill: #fff; }
+@keyframes rec-pulse { 50% { stroke: #ff453a; filter: drop-shadow(0 0 3px #ff453a); } }
+.recbadge { position: absolute; top: 1.2%; left: 50%; transform: translateX(-50%); padding: 2px 12px; border-radius: 999px;
+            background: #ff453a; color: #fff; font: 700 13px/1.5 ui-monospace, Menlo, monospace; letter-spacing: .08em;
+            pointer-events: none; box-shadow: 0 0 12px rgba(255, 69, 58, .7); }
+.recbadge.armed { background: #2a2a2d; color: #ff453a; border: 2px solid #ff453a; }
+.recbadge[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .recon .face.btn { animation: none; } }
 .start { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px;
          background: rgba(0, 0, 0, .5); border-radius: 4% / 6%; }
 .start[hidden] { display: none; }
@@ -76,6 +86,7 @@ footer small { font-size: 11px; opacity: .8; }
 <div class="device" id="device">
   <svg id="panel" viewBox="0 0 1000 624" aria-hidden="true"></svg>
   <canvas id="screen" width="240" height="240" role="img" aria-label="The screen"></canvas>
+  <div class="recbadge" id="recbadge" role="status" hidden></div>
   <div class="start" id="start"><button id="go" type="button">Switch on</button><p id="status" hidden></p></div>
 </div>
 
@@ -129,6 +140,7 @@ const LAYOUTS = {
     grid: [24, 582, 86, 60, 94, 70], keybed: [14, 800, 572, 256],
   },
 };
+const recBadge = document.getElementById("recbadge");
 const svg = document.getElementById("panel"), device = document.getElementById("device"), canvas = document.getElementById("screen");
 function el(tag, attrs, parent = svg) {
   const e = document.createElementNS(NS, tag);
@@ -301,7 +313,7 @@ function bindKnob(k) {
     if (!drag) return;
     drag.acc += drag.y - e.clientY;
     drag.y = e.clientY;
-    const step = k.role === "master" ? 3 : 8, n = Math.trunc(drag.acc / step);
+    const step = k.role === "master" ? 3 : 4, n = Math.trunc(drag.acc / step);   // (Glitchbox: 8 -> 4 px a detent)
     if (n) { drag.acc -= n * step; turn(k, n); }
   });
   const end = () => { drag = null; };
@@ -312,8 +324,8 @@ function bindKnob(k) {
     const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
     if (Math.abs(dy) >= 50) { turn(k, dy < 0 ? 1 : -1); wheel = 0; return; }   // a wheel notch: one detent
     wheel -= dy;                                                                   // a trackpad: by distance
-    const n = Math.trunc(wheel / 25);
-    if (n) { wheel -= n * 25; turn(k, n); }
+    const n = Math.trunc(wheel / 12);
+    if (n) { wheel -= n * 12; turn(k, n); }
   }, { passive: false });
   k.hit.addEventListener("keydown", (e) => {
     const d = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key];
@@ -387,7 +399,12 @@ function drawAnim(anim) {
 function drawLights([litB, litK, dimB, dimK, dimLo = 0, brB = 0, brK = 0, midK = 0], anim = null) {
   drawAnim(anim);
   document.documentElement.classList.toggle("dimlo", !!dimLo);   // (the breath's lower peak)
+  const rec = !anim && !!(litB & (1 << B.REC)), playing = !!(litB & (1 << PLAY_GREEN | 1 << B.PLAY));
+  recBadge.hidden = !rec;                                        // Glitchbox: REC on, seen at a glance
+  recBadge.classList.toggle("armed", !playing);
+  recBadge.textContent = playing ? "\u25CF RECORDING" : "\u25CF REC ARMED";
   for (const b of buttons) {
+    b.g.classList.toggle("recon", rec && b.bit === B.REC);
     const bit = 1 << b.bit, green = b.bit === B.PLAY && (litB & (1 << PLAY_GREEN));
     b.g.classList.toggle("lit", !!(litB & bit) && !green);
     b.g.classList.toggle("green", !!green);

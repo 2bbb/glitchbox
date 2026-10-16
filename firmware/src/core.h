@@ -186,9 +186,21 @@ typedef struct {
     uint8_t pat;                 /* suggested pattern (PATTERNS[pat - 1], 0 = none): only a hint. A sound load
                                   * never touches the steps; SEQ > PATTERNS loads a pattern (ui.c pat_load). The
                                   * arp is the track's too: a preset does not set it */
+    uint8_t ins[5];              /* Glitchbox: the INSERT, TYPE A B C MIX, each stored + 1, 0 = the default (OFF) */
 } preset_t;
 #define FX(d, c, dl, r) .fx = {(d) + 1, (c) + 1, (dl) + 1, (r) + 1}
 #define PAT(n) .pat = (n)
+#define INS(ty, a, b, c, m) .ins = {(ty) + 1, (a) + 1, (b) + 1, (c) + 1, (m) + 1}
+/* the INSERT's TYPEs a preset names (fx.c IT_*: checked there) */
+enum { INS_SOFT = 1, INS_HARD, INS_FOLD, INS_FUZZ, INS_CRUSH, INS_MUFF = 9, INS_BASS, INS_SMASH };
+/* a preset's INSERT onto a track's values (after the loads have set them to their defaults) */
+static inline void preset_ins(int16_t *p, const preset_t *pr)
+{
+    uint32_t i;
+    for (i = 0; i < 5u; i++)
+        if (pr->ins[i])
+            p[P_ITYPE + i] = (int16_t)(pr->ins[i] - 1);
+}
 
 struct track;
 typedef struct {                 /* an engine (engines.c ENGINES[]; the eng_*.c files) */

@@ -611,6 +611,8 @@ static __attribute__((noinline)) void rev_side_mix(int32_t *l, int32_t *r, uint3
  * ISR's inlined path gains one test per part (track_t ins_run) */
 enum { IT_OFF, IT_SOFT, IT_HARD, IT_FOLD, IT_FUZZ, IT_CRUSH, IT_PHASER, IT_FLANGER, IT_CHORUS,
        IT_MUFF, IT_BASS, IT_SMASH, IT_N };   /* Glitchbox's three: MUFF, BASS, SMASH (ins_wreck) */
+_Static_assert(IT_FOLD == INS_FOLD && IT_FUZZ == INS_FUZZ && IT_CRUSH == INS_CRUSH && IT_MUFF == INS_MUFF &&
+               IT_BASS == INS_BASS && IT_SMASH == INS_SMASH, "core.h INS_* follow fx.c IT_*");
 #define IL_LEN 256u                     /* FLANG / CHOR: the line, samples (a power of 2: masked) */
 static const uint8_t INS_HOLD[16] = {64, 48, 40, 32, 24, 20, 16, 12, 10, 8, 6, 5, 4, 3, 2, 1};   /* CRUSH RATE */
 typedef struct {

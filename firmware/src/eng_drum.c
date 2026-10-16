@@ -350,7 +350,7 @@ static int32_t drum_keys(const track_t *t, uint32_t k)
 static const preset_t DRUM_PRESETS[] = {
     {"DRUM KIT", DRUM_KIT_E, {0, 100, 127, 100}, 0, 0, FX(0, 0, 0, 20), PAT(12)},   /* (core.h: SAMPLE PERC's too) */
     /* Glitchbox: KIT DSTR, crushed and driven, its own beat */
-    {"DESTROY", {DK_DSTR, 58, 80, 72, 85, 115, 0, 120}, {0, 100, 127, 100}, 0, 0, FX(25, 0, 10, 15), PAT(14)},
+    {"DESTROY", {DK_DSTR, 58, 80, 72, 85, 115, 0, 120}, {0, 100, 127, 100}, 0, 0, FX(25, 0, 10, 15), PAT(14), INS(INS_SMASH, 85, 45, 110, 110)},
 };
 
 static const engine_t ENG_DRUM = {

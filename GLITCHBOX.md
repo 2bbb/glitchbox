@@ -30,6 +30,26 @@ Presets: DESTROYER, FUZZ BASS, BROKEN, SCREAM, NOIZ HIT, HUM, NASTY FM, CRUSH LE
 
 Note: GLITCH took WHEEL's engine slot. Felucca's saved data only has room for 14 engine slots. A Felucca project or preset that used WHEEL will load as GLITCH.
 
+### INSERT per preset
+
+A preset can now carry its own INSERT (TYPE, A, B, C and MIX), applied whenever it loads:
+
+| Preset | INSERT |
+|---|---|
+| DESTROYER, SQR FUZZ, REESE | MUFF |
+| FUZZ BASS, 808 DIST, GRIT BASS | BASS (clean low band kept, highs destroyed) |
+| NOIZ HIT, OCTA SMASH, DRUM DESTROY | SMASH (compressor + hard clip) |
+| SCREAM | FUZZ |
+| CRUSH LEAD | CRUSH |
+| MELTDOWN | FOLD |
+
+Each INSERT's LEVEL is set so the preset stays near its level without it. Turn INSERT to OFF on the track for the raw sound.
+
+### Knobs and the emulator
+
+- KNOB ACCEL is ON by default: fast turns of wide values move 2x to 8x (MENU > CONTROL > KNOB ACCEL to switch it off).
+- In the browser emulator a knob moves twice as fast per pixel of drag or trackpad scroll, and REC on shows a red outline on REC plus a "REC ARMED" / "RECORDING" badge above the panel.
+
 ### DESTROY drum kit
 
 In the DRUM engine, KIT = DSTR, and the preset is DRUM > DESTROY. It uses Felucca's standard drum voices, pushed harder:

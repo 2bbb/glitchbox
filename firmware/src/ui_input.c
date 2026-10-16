@@ -454,7 +454,7 @@ static void ui_leds(void)
 static int32_t accel(uint32_t role, int32_t s, int32_t range)
 {
     uint32_t now = fm1_ms & 0xFFFFFFu, st = ui.enc_t[role], up = s > 0, pi = st >> 25, a, i, m = 1;
-    if (!(ui_prefs & PREF_ACCEL) || range <= 32 || !s)
+    if (!accel_on() || range <= 32 || !s)
         return s;
     a = (uint32_t)(s < 0 ? -s : s);
     i = ((now - st) & 0xFFFFFFu) / a;                   /* ms per detent of this read */
