@@ -123,7 +123,7 @@ static void clipping(void)
     static const int16_t DRV[3] = {0, 63, 127}, CR[2] = {0, 127};
     static int32_t o[2 * CTL], b[CTL];
     uint32_t w, d, c, i, k, worst = 0, full = 0;
-    for (w = 0; w < 8u; w++)
+    for (w = 0; w < NELEM(N_GLITCH_WAVE); w++)
         for (d = 0; d < 3u; d++)
             for (c = 0; c < 2u; c++) {
                 int16_t e[8] = {(int16_t)w, 127, 127, DRV[d], CR[c], 127, 20, 127};
