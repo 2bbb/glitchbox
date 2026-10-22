@@ -83,6 +83,38 @@ At power-on, T1 is GLITCH DESTROYER, T2 is GLITCH FUZZ BASS, T3 is GLITCH HUM an
 
 The metronome clicks **while recording** by default (MENU > AUDIO > CLICK REC; OFF and ON are still there). The build switch `GLITCHBOX_DEFAULTS=0` restores Felucca's start sounds and CLICK OFF.
 
+## EHL damage (this fork, v1.5.1-ehl1)
+
+Failure models from the EsionHsrahLatigid plug-ins, running on the FM-1's real integer audio path: the sound breaks
+the way a broken codec, a fixed-point chip or an audio driver breaks it.
+
+### Five more INSERT types (per track: INSERT > TYPE)
+
+| TYPE | A | B | C | What it does |
+|---|---|---|---|---|
+| **ADPCM** | BITS | ERR | RATE | IMA ADPCM in the loop: 2 to 5 bits a code, bit errors and a knocked step index that make the decoder drift away from the encoder, codes held 1 to 16 samples |
+| **OVRFL** | FREQ | RES | DRIVE | a resonant low-pass in 16-bit words that wrap instead of clipping: past the edge it folds over and falls into limit cycles of its own |
+| **MISRD** | MODE | PROB | SEG | segments read as another format: SWAP (bytes), ULAW, SIGN, HALF (float), NIBL, SHIFT (a byte late), BREV (bits reversed) or MIX |
+| **SHEAR** | BITS | FAULT | CLOCK | a word corrupter: 16 to 2 bits, a jittering sample-and-hold, bursts that XOR, rotate or swap the words |
+| **UNDRN** | LOAD | MODE | BUF | buffers that miss their deadline: the last buffer again (MODE 0) or silence and stale memory (MODE up), 32 to 256 samples |
+
+### Four more FX keys (hold FX + a white key)
+
+| Key | Effect |
+|---|---|
+| **G4** | **WRAP**: the master's words wrap around at -12 dBFS (two's complement overflow) instead of clipping |
+| **A4** | **BITFLIP**: bit errors in the master's 16-bit words |
+| **B4** | **UNDERRUN**: late 32-sample blocks repeat or drop out |
+| **E5** | **ADPCM**: the master through 3-bit ADPCM with a knocked step index |
+
+KNOB 2 (CRUSH) with FX makes BITFLIP, UNDERRUN and ADPCM's errors denser. OCT UP, OCT DN, FLANGER and ECHO THROW left
+the default map; hold a key in the FX layer and turn PRESETS to put them back.
+
+### Presets and power-on
+
+New GLCH presets: CODEC ROT, OVERFLOW, MISREAD, SHEARED, UNDERRUN and BIT ROT BASS, each with its damage INSERT.
+At power-on T1 is CODEC ROT, T2 BIT ROT BASS, T3 UNDERRUN and T4 DRUM DESTROY.
+
 ## Volca-style live programming
 
 Felucca already has this:

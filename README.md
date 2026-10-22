@@ -7,6 +7,11 @@ that chop themselves up, hard-clipped and bit-crushed leads and basses, nasty FM
 effects you play live. Everything is synthesised; there are no samples to load. Playing it is less about making
 beautiful sounds and more about taming a beast.
 
+> **This fork (2bbb/glitchbox) adds EHL damage:** five INSERT types (ADPCM, OVRFL, MISRD, SHEAR, UNDRN) and four
+> FX keys (WRAP, BITFLIP, UNDERRUN, ADPCM) that break the sound like a broken codec, fixed-point chip or audio
+> driver. See [GLITCHBOX.md](GLITCHBOX.md#ehl-damage-this-fork-v151-ehl1). Built and flashed on a real FM-1
+> (2026-10-23); its sound on the device has not been checked by ear yet.
+
 Glitchbox is a fork of [Felucca](https://github.com/hugelton/Felucca) v1.5.1 by Hügelton Instruments. Everything
 Felucca does still works; Glitchbox adds a new engine, a drum kit, live effects and dirtier defaults.
 
