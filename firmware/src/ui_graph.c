@@ -462,7 +462,8 @@ static void graph_insert(const track_t *t, uint16_t c)
             y = cy - (w >> 1) * a / 32768 * t->p[P_IB] / 127;
         } else {                                     /* the curve: v in, dry v, wet shaped */
             int32_t v = (x - PANEL_W / 2) * 49152 / (PANEL_W / 2), o;
-            o = ty == IT_CRUSH ? ins_shape(IT_CRUSH, v, sh) : (ins_shape((uint32_t)ty, ((v >> 3) * g) >> 9, 0) * lvl) >> 12;
+            o = ty >= IT_ADPCM ? dmg_curve(t, (uint32_t)ty, v)
+              : ty == IT_CRUSH ? ins_shape(IT_CRUSH, v, sh) : (ins_shape((uint32_t)ty, ((v >> 3) * g) >> 9, 0) * lvl) >> 12;
             w = v + mulq16(o - v, (uint32_t)m << 1);
             y = cy - clamp(w, -49152, 49152) * a / 49152;
         }

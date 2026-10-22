@@ -192,7 +192,8 @@ typedef struct {
 #define PAT(n) .pat = (n)
 #define INS(ty, a, b, c, m) .ins = {(ty) + 1, (a) + 1, (b) + 1, (c) + 1, (m) + 1}
 /* the INSERT's TYPEs a preset names (fx.c IT_*: checked there) */
-enum { INS_SOFT = 1, INS_HARD, INS_FOLD, INS_FUZZ, INS_CRUSH, INS_MUFF = 9, INS_BASS, INS_SMASH };
+enum { INS_SOFT = 1, INS_HARD, INS_FOLD, INS_FUZZ, INS_CRUSH, INS_MUFF = 9, INS_BASS, INS_SMASH,
+       INS_ADPCM, INS_OVFL, INS_MISRD, INS_SHEAR, INS_UNDRN };   /* EHL damage (ehl_damage.c) */
 /* a preset's INSERT onto a track's values (after the loads have set them to their defaults) */
 static inline void preset_ins(int16_t *p, const preset_t *pr)
 {

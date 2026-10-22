@@ -27,9 +27,9 @@ static const char *const PRESET_CAT[16] = {
     "KKLL",                      /* 4 SAMPLE: PIANO, (PIANO: the retired TRANH's alias), FLUTE, SAX */
     "PLBF",                      /* 5 VOICE: CHOIR AAH, VOX LEAD, WOW BASS, WHISPER */
     "BLLUP",                     /* 6 TRIO: FAT BASS, ARP LEAD, SYNC LEAD, RING BELL, CHIP CHOIR */
-    "LBFLFBLLBBLBBBBBBB",        /* 7 GLITCH: DESTROYER, FUZZ BASS, BROKEN, SCREAM, NOIZ HIT, HUM, NASTY FM, CRUSH LEAD,
+    "LBFLFBLLBBLBBBBBBBLLFLFB",  /* 7 GLITCH: DESTROYER, FUZZ BASS, BROKEN, SCREAM, NOIZ HIT, HUM, NASTY FM, CRUSH LEAD,
                                   * SQR FUZZ, FM BASS, MELTDOWN, RUST SAW, REESE, 808 DIST, GRIT BASS, GROWL, ACID FUZZ,
-                                  * OCTA SMASH */
+                                  * OCTA SMASH; EHL damage: CODEC ROT, OVERFLOW, MISREAD, SHEARED, UNDERRUN, BIT ROT BASS */
     "PFPP",                      /* 8 GRAIN: CLOUD PAD, GLITCH, FROZEN, SHIMMER */
     "UUUPUDDPU",                 /* 9 PHYS: BELL TREE, MARIMBA, PLUCK, BOWED METAL, KALIMBA, HAND DRUM, TOMS, DRONE
                                   * STRING, HARP */

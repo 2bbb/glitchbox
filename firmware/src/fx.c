@@ -226,6 +226,7 @@ static uint32_t div_samples(uint32_t div)
     return div < 6u ? quarter / DIV_DEN[div] : div < 10u ? quarter << (div - 5u) : quarter / DIV_DEN[div % 6u];
 }
 
+#include "ehl_codec.c"                                  /* EHL damage: faults, IMA ADPCM (ehl_damage.c, perform.c) */
 #include "perform.c"                                 /* the FX hold layer's effects (the master) */
 #include "click.c"                                   /* the metronome's click (after the master: audio.c) */
 
@@ -610,9 +611,12 @@ static __attribute__((noinline)) void rev_side_mix(int32_t *l, int32_t *r, uint3
  * repeats the processed sound. State in the pool, per track (ins[], 580 B each); noinline, its own loops: the audio
  * ISR's inlined path gains one test per part (track_t ins_run) */
 enum { IT_OFF, IT_SOFT, IT_HARD, IT_FOLD, IT_FUZZ, IT_CRUSH, IT_PHASER, IT_FLANGER, IT_CHORUS,
-       IT_MUFF, IT_BASS, IT_SMASH, IT_N };   /* Glitchbox's three: MUFF, BASS, SMASH (ins_wreck) */
+       IT_MUFF, IT_BASS, IT_SMASH,          /* Glitchbox's three: MUFF, BASS, SMASH (ins_wreck) */
+       IT_ADPCM, IT_OVFL, IT_MISRD, IT_SHEAR, IT_UNDRN,   /* EHL damage (ehl_damage.c) */
+       IT_N };
 _Static_assert(IT_FOLD == INS_FOLD && IT_FUZZ == INS_FUZZ && IT_CRUSH == INS_CRUSH && IT_MUFF == INS_MUFF &&
-               IT_BASS == INS_BASS && IT_SMASH == INS_SMASH, "core.h INS_* follow fx.c IT_*");
+               IT_BASS == INS_BASS && IT_SMASH == INS_SMASH && IT_ADPCM == INS_ADPCM && IT_OVFL == INS_OVFL &&
+               IT_MISRD == INS_MISRD && IT_SHEAR == INS_SHEAR && IT_UNDRN == INS_UNDRN, "core.h INS_* follow fx.c IT_*");
 #define IL_LEN 256u                     /* FLANG / CHOR: the line, samples (a power of 2: masked) */
 static const uint8_t INS_HOLD[16] = {64, 48, 40, 32, 24, 20, 16, 12, 10, 8, 6, 5, 4, 3, 2, 1};   /* CRUSH RATE */
 typedef struct {
@@ -870,6 +874,8 @@ static __attribute__((noinline)) void ins_wreck(ins_t *s, const track_t *t, int3
     }
 }
 
+#include "ehl_damage.c"                                 /* ADPCM, OVRFL, MISRD, SHEAR, UNDRN */
+
 /* the INSERT at rest at once (mix_part: TYPE turned OFF while the part was silent, its fade never ran) */
 static __attribute__((noinline)) void ins_rest(track_t *t)
 {
@@ -893,7 +899,9 @@ static __attribute__((noinline)) void track_insert(track_t *t, int32_t *b, uint3
         memset(s, 0, sizeof *s);                        /* starting: no stale line or filter */
         s->type = (uint8_t)ty;
     }
-    if (s->type >= IT_MUFF)
+    if (s->type >= IT_ADPCM)
+        ins_damage(s, t, b, n, tw);
+    else if (s->type >= IT_MUFF)
         ins_wreck(s, t, b, n, tw);
     else if (s->type >= IT_PHASER)
         ins_swept(s, t, b, n, tw);

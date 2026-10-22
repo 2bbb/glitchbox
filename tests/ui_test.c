@@ -7247,14 +7247,23 @@ static int test_fx_map(void)
     ok &= perf_map[10] == PF_CRSW && perf_held == PF_BIT(PF_CRSW) && msg_is("B4 CRUSH SWEEP");
     turn(EN_PRESET, 1); keyboard_block();
     ok &= perf_map[10] == PF_RAND && perf_held == PF_BIT(PF_RAND) && msg_is("B4 RANDOM");
+    turn(EN_PRESET, 1); keyboard_block();               /* EHL damage: WRAP, BITFLIP, UNDERRUN, ADPCM after RANDOM */
+    ok &= perf_map[10] == PF_WRAP && perf_held == PF_BIT(PF_WRAP) && msg_is("B4 WRAP");
+    turn(EN_PRESET, 1); keyboard_block();
+    ok &= perf_map[10] == PF_BFLP && perf_held == PF_BIT(PF_BFLP) && msg_is("B4 BITFLIP");
+    turn(EN_PRESET, 1); keyboard_block();
+    ok &= perf_map[10] == PF_UNDR && perf_held == PF_BIT(PF_UNDR) && msg_is("B4 UNDERRUN");
+    turn(EN_PRESET, 1); keyboard_block();
+    ok &= perf_map[10] == PF_ADPC && perf_held == PF_BIT(PF_ADPC) && msg_is("B4 ADPCM");
     turn(EN_PRESET, 1); keyboard_block();               /* past the last: NONE */
     ok &= perf_map[10] == PF_N && !perf_held && msg_is("B4 NONE") && (kb_layer >> b4) & 1u;
     turn(EN_PRESET, 1); keyboard_block();               /* round: the first */
     ok &= perf_map[10] == PF_R8 && perf_held == PF_BIT(PF_R8);
+    turn(EN_PRESET, -1); turn(EN_PRESET, -1); turn(EN_PRESET, -1); turn(EN_PRESET, -1);
     turn(EN_PRESET, -1); turn(EN_PRESET, -1); turn(EN_PRESET, -1); turn(EN_PRESET, -1); keyboard_block();
-    ok &= perf_map[10] == PF_GATE && (perf_held & PF_BIT(PF_GATE)) && lys.rp_dirty;   /* (R8 NONE RAND CRSW GATE) */
+    ok &= perf_map[10] == PF_GATE && (perf_held & PF_BIT(PF_GATE)) && lys.rp_dirty;   /* (R8 NONE ADPC UNDR FLIP WRAP RAND CRSW GATE) */
     ok &= (TSEL->preset | (uint32_t)TSEL->eng_req << 8) == snd && !gates();
-    bad += check("  FX + B4 held + PRESETS: PHASER, the throws, ROLL GATE CRSH SWP RANDOM, NONE, round to REPEAT 1/8 and back; no sound load", ok);
+    bad += check("  FX + B4 held + PRESETS: PHASER, the throws, ROLL GATE CRSH SWP RANDOM, WRAP BITFLIP UNDERRUN ADPCM, NONE, round to REPEAT 1/8 and back; no sound load", ok);
     btn_down(B_EDIT); frame(); btn_up(B_EDIT); frame(); keyboard_block();
     ok = perf_map[10] == PF_FLG && perf_held == PF_BIT(PF_FLG) && msg_is("B4 FLANGER (DEF)") && ui.layer == LAYER_FX;
     bad += check("  EDIT with the key held: its default (FLANGER) back, the layer open", ok);

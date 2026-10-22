@@ -45,6 +45,13 @@
  *   RANDOM     on every 1/16 a dice roll: half the time nothing, else REPEAT 1/16, REPEAT 1/32, REVERSE or GATE for
  *              that 1/16 (as if its key were pressed there); the dice: rng()
  * Default keys (Glitchbox): C5 (was PHASER) GATE, D5 (was REV THROW) CRSH SWP, the two free keys F5 G5 ROLL and RANDOM.
+ * EHL damage adds four more (codes 20..23), the master broken as a codec, a chip or a driver breaks it:
+ *   WRAP       the master's words wrap around at -12 dBFS instead of clipping (two's complement overflow)
+ *   BITFLIP    random bit errors in the master's 16-bit words, bits 9..14 and the sign, about one sample in eight
+ *   UNDERRUN   each control block (32 samples) late with a third's chance: the block before it again, or silence
+ *   ADPCM      the master through 3-bit IMA ADPCM whose decoder's step index is knocked every few ms
+ * KNOB 2 (CRUSH) deepens BITFLIP, UNDERRUN and ADPCM's errors. Their default keys: G4 A4 B4 E5 (OCT UP, OCT DN,
+ * FLANGER and ECHO THROW move off the default map; any key can still be set to them).
  * MENU > FX LATCH ON (#40, a hand that cannot hold FX, a key and a knob together): a key pressed with FX turns its
  * effect on, the next press turns it off (perf_latched; letting the key or FX go does nothing), the macros keep
  * their values when FX is let go, FX + OCT- turns everything off (ui_layer.c), so does the menu or a dialog.
@@ -56,7 +63,9 @@
 enum { PF_R8, PF_R16, PF_R32, PF_REV, PF_LPF, PF_HPF, PF_TAPE, PF_FRZ, PF_OUP, PF_ODN, PF_FLG, PF_PHS,
        PF_RTHR, PF_ETHR,                      /* 1.5.1: REV THROW, ECHO THROW */
        PF_ROLL, PF_GATE, PF_CRSW, PF_RAND,    /* Glitchbox: ROLL, GATE, CRSH SWP, RANDOM */
+       PF_WRAP, PF_BFLP, PF_UNDR, PF_ADPC,    /* EHL damage: WRAP, BITFLIP, UNDERRUN, ADPCM */
        PF_M1, PF_N = PF_M1 + NTRK };
+#define PF_DMG (PF_BIT(PF_WRAP) | PF_BIT(PF_BFLP) | PF_BIT(PF_UNDR) | PF_BIT(PF_ADPC))
 #define PF_NFX PF_M1                          /* the effects a white key can hold */
 #define PF_KEYS 16u                           /* the white keys F3 .. G5 */
 #define PF_BIT(e) (1u << (e))
@@ -90,10 +99,15 @@ enum { BM_NONE, BM_LOOP, BM_TAPE, BM_FRZ, BM_HARM };
 
 /* the white keys' effects by default (1.1.5's ten, then FLANGER and PHASER, 1.5.1's REV THROW and ECHO THROW on D5
  * and E5; PF_N: none) */
-static const uint8_t PF_DEF[PF_KEYS] = {PF_R8, PF_R16, PF_R32, PF_REV, PF_LPF, PF_HPF, PF_TAPE, PF_FRZ, PF_OUP, PF_ODN,
-                                        PF_FLG, PF_GATE, PF_CRSW, PF_ETHR, PF_ROLL, PF_RAND};   /* (Glitchbox: 11 12 14 15) */
-static volatile uint8_t perf_map[PF_KEYS] = {PF_R8, PF_R16, PF_R32, PF_REV, PF_LPF, PF_HPF, PF_TAPE, PF_FRZ, PF_OUP,
-                                             PF_ODN, PF_FLG, PF_GATE, PF_CRSW, PF_ETHR, PF_ROLL, PF_RAND};
+#if GLITCHBOX_DEFAULTS                         /* EHL damage on G4 A4 B4 E5 (8 9 10 13) */
+#define PF_DEF_KEYS {PF_R8, PF_R16, PF_R32, PF_REV, PF_LPF, PF_HPF, PF_TAPE, PF_FRZ, PF_WRAP, PF_BFLP, PF_UNDR, PF_GATE, \
+                     PF_CRSW, PF_ADPC, PF_ROLL, PF_RAND}
+#else                                         /* Glitchbox 1.5.1's (the upstream tests' map) */
+#define PF_DEF_KEYS {PF_R8, PF_R16, PF_R32, PF_REV, PF_LPF, PF_HPF, PF_TAPE, PF_FRZ, PF_OUP, PF_ODN, PF_FLG, PF_GATE, \
+                     PF_CRSW, PF_ETHR, PF_ROLL, PF_RAND}
+#endif
+static const uint8_t PF_DEF[PF_KEYS] = PF_DEF_KEYS;
+static volatile uint8_t perf_map[PF_KEYS] = PF_DEF_KEYS;
                                       /* main: white key p's effect (PF_N none), from the settings (ui_layer.c) */
 static volatile uint8_t perf_remap;   /* main: perf_map changed (seq.c: a key held takes its new effect) */
 
@@ -158,6 +172,11 @@ static struct {
     int32_t gc;                        /* GATE: how far it is closed, Q15 (0 = open: zeroed state is idle) */
     uint32_t cst;                      /* CRSH SWP: samples held */
     uint8_t rpick, rarm;               /* RANDOM: the effect it plays this 1/16 (PF_N none); rolled once */
+    /* EHL damage: WRAP, BITFLIP, ADPCM shares (Q15); ADPCM's codec L R (pred, index) and held words; UNDERRUN's
+     * last block and the fault generator */
+    int32_t ww, bw, aw, ap[2], ai[2], ah[2];
+    uint32_t an, dr, ulen;
+    int32_t ul[CTL], ur[CTL];
     /* FLANGER, PHASER */
     int32_t fw, pw;                    /* their shares, Q15 */
     uint32_t fwp, fn;                  /* FLANGER: the frame written next; frames written since it started */
@@ -779,6 +798,69 @@ static __attribute__((noinline)) void perf_phaser(int32_t *bl, int32_t *br, uint
     }
 }
 
+/* EHL damage, a sample (perf_block, after GATE): WRAP, BITFLIP, ADPCM, each faded in and out by its share */
+static __attribute__((noinline)) void perf_damage(uint32_t a, int32_t *pl, int32_t *pr)
+{
+    int32_t l = *pl, r = *pr, deep = perf_k[1] > 0 ? perf_k[1] : 0;   /* KNOB 2: deeper errors */
+    pf.ww += clamp((a & PF_BIT(PF_WRAP) ? 32768 : 0) - pf.ww, -SL_SLOPE, SL_SLOPE);
+    pf.bw += clamp((a & PF_BIT(PF_BFLP) ? 32768 : 0) - pf.bw, -SL_SLOPE, SL_SLOPE);
+    pf.aw += clamp((a & PF_BIT(PF_ADPC) ? 32768 : 0) - pf.aw, -SL_SLOPE, SL_SLOPE);
+    if (pf.ww) {                                    /* the word wraps at a quarter of full scale (-12 dBFS) */
+        int32_t yl = (int32_t)(int16_t)(clamp(l, -131072, 131071) << 2) >> 2;
+        int32_t yr = (int32_t)(int16_t)(clamp(r, -131072, 131071) << 2) >> 2;
+        l = pf_mix(l, yl, pf.ww);
+        r = pf_mix(r, yr, pf.ww);
+    }
+    if (pf.bw) {
+        uint32_t q = dmg_rng(&pf.dr), every = deep > 50 ? 1u : deep > 20 ? 3u : 7u;
+        int32_t yl = clamp(l, -32768, 32767), yr = clamp(r, -32768, 32767);
+        if (!(q & every))
+            yl = (int16_t)((uint32_t)yl ^ (q & 0x100000u ? 0x8000u : 1u << (9u + (q >> 8) % 6u)));
+        if (!((q >> 4) & every))
+            yr = (int16_t)((uint32_t)yr ^ (q & 0x200000u ? 0x8000u : 1u << (9u + (q >> 12) % 6u)));
+        l = pf_mix(l, yl, pf.bw);
+        r = pf_mix(r, yr, pf.bw);
+    }
+    if (pf.aw) {                                    /* 3-bit ADPCM, a code every 2 samples, the index knocked */
+        if (!(pf.an++ & 1u)) {
+            uint32_t q = dmg_rng(&pf.dr), k;
+            int32_t in[2] = {clamp(l, -32768, 32767), clamp(r, -32768, 32767)};
+            for (k = 0; k < 2u; k++)
+                pf.ah[k] = ima_step(&pf.ap[k], &pf.ai[k], ima_code(in[k], pf.ap[k], pf.ai[k], 3u));
+            if ((q & 0x1FFu) < 3u + (uint32_t)deep)    /* every few ms: a channel's step index knocked */
+                pf.ai[q >> 31] = clamp(pf.ai[q >> 31] + (int32_t)((q >> 9) & 31u) - 15, 0, 88);
+        }
+        l = pf_mix(l, pf.ah[0], pf.aw);
+        r = pf_mix(r, pf.ah[1], pf.aw);
+    } else {
+        pf.ap[0] = pf.ap[1] = pf.ai[0] = pf.ai[1] = 0;
+    }
+    *pl = l;
+    *pr = r;
+}
+
+/* EHL damage: UNDERRUN, a block (perf_block, at its end): late blocks repeat the one before or go silent */
+static __attribute__((noinline)) void perf_underrun(int32_t *bl, int32_t *br, uint32_t n)
+{
+    uint32_t i, q = dmg_rng(&pf.dr), on = (pf.act & PF_BIT(PF_UNDR)) != 0;
+    uint32_t late = (q & 0xFFu) < 85u + (uint32_t)(perf_k[1] > 0 ? perf_k[1] : 0);
+    if (n > CTL)
+        n = CTL;
+    if (on && late && pf.ulen == n) {
+        int zero = ((q >> 8) & 3u) == 0u;
+        for (i = 0; i < n; i++) {
+            bl[i] = zero ? 0 : pf.ul[i];
+            br[i] = zero ? 0 : pf.ur[i];
+        }
+        return;                                     /* (a repeated block stays the one kept: it repeats again) */
+    }
+    for (i = 0; i < n; i++) {
+        pf.ul[i] = bl[i];
+        pf.ur[i] = br[i];
+    }
+    pf.ulen = on ? n : 0u;
+}
+
 /* after the master level: the buffer effect, LPF, HPF, CRUSH on l / r (stereo, Q15) */
 static __attribute__((noinline)) void perf_block(int32_t *bl, int32_t *br, uint32_t n)
 {
@@ -846,14 +928,18 @@ static __attribute__((noinline)) void perf_block(int32_t *bl, int32_t *br, uint3
         }
         if (++gp >= gq)
             gp = 0;
+        if ((a & PF_DMG) || pf.ww || pf.bw || pf.aw)
+            perf_damage(a, &l, &r);
         bl[i] = l;
         br[i] = r;
     }
+    if ((pf.act & PF_BIT(PF_UNDR)) || pf.ulen)
+        perf_underrun(bl, br, n);
     if ((pf.act & PF_BIT(PF_FLG)) || pf.fw || pf.fn)
         perf_flanger(bl, br, n);
     if ((pf.act & PF_BIT(PF_PHS)) || pf.pw)
         perf_phaser(bl, br, n);
     pf.busy = pf.act || pf.mode != BM_NONE || pf.w || pf.la || pf.ha || pf.cw || pf.td || pf.mute || pf.fw || pf.pw || pf.thr ||
-              pf.gc ||
+              pf.gc || pf.ww || pf.bw || pf.aw || pf.ulen ||
               pf.fn || perf_k[0] || perf_k[1] || perf_k[2];
 }

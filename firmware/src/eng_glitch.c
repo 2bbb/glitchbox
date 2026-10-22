@@ -442,6 +442,13 @@ static const preset_t GLITCH_PRESETS[] = {
     {"GROWL", {GW_GROW, 78, 85, 110, 40, 75, 72, 40}, {0, 75, 90, 25}, 40, 1, FX(20, 0, 10, 10), PAT(2)},
     {"ACID FUZZ", {GW_FUZZ, 50, 120, 105, 25, 55, 50, 0}, {0, 45, 60, 20}, 60, 1, FX(20, 0, 20, 10), PAT(2)},
     {"OCTA SMASH", {GW_FUZZ, 70, 60, 127, 60, 55, 80, 90}, {0, 60, 110, 20}, 25, 1, FX(30, 0, 0, 5), PAT(2), INS(INS_SMASH, 90, 50, 112, 127)},
+    /* EHL damage (ehl_damage.c): a broken codec, chip or driver on the INSERT */
+    {"CODEC ROT", {GW_FMX, 92, 85, 118, 60, 70, 30, 70}, {0, 70, 100, 40}, 25, 1, FX(25, 0, 35, 20), PAT(4), INS(INS_ADPCM, 0, 110, 112, 127)},
+    {"OVERFLOW", {GW_SAW, 70, 118, 120, 40, 30, 50, 40}, {0, 70, 110, 35}, 45, 1, FX(20, 0, 30, 20), PAT(4), INS(INS_OVFL, 76, 122, 96, 127)},
+    {"MISREAD", {GW_FAT, 75, 100, 120, 70, 50, 40, 60}, {0, 60, 100, 30}, 35, 1, FX(25, 0, 30, 25), PAT(13), INS(INS_MISRD, 120, 100, 72, 127)},
+    {"SHEARED", {GW_SQR, 80, 95, 127, 50, 40, 50, 30}, {0, 60, 100, 30}, 40, 1, FX(30, 0, 30, 15), PAT(4), INS(INS_SHEAR, 92, 105, 84, 127)},
+    {"UNDERRUN", {GW_DUAL, 70, 110, 120, 70, 60, 40, 80}, {0, 70, 110, 40}, 35, 1, FX(25, 0, 40, 25), PAT(13), INS(INS_UNDRN, 105, 70, 40, 127)},
+    {"BIT ROT BASS", {GW_FUZZ, 60, 75, 120, 30, 65, 45, 0}, {0, 60, 110, 20}, 30, 1, FX(20, 0, 0, 5), PAT(2), INS(INS_ADPCM, 40, 75, 120, 127)},
 };
 
 static const engine_t ENG_GLITCH = {

@@ -194,7 +194,8 @@ static const struct {
  * DESTROYER (lead), FUZZ BASS, HUM (drone), DRUM DESTROY (KIT DSTR); every sequencer empty, to be played in live */
 #define ENGI_GLITCH 7u
 #if GLITCHBOX_DEFAULTS
-static const uint8_t TRK_DEF[NPART][3] = {{ENGI_GLITCH, 0, 0}, {ENGI_GLITCH, 1, 0}, {ENGI_GLITCH, 5, 0}, {ENGI_DRUM, 1, 0}};
+/* (EHL damage: CODEC ROT lead, BIT ROT BASS, UNDERRUN pad, DRUM DESTROY) */
+static const uint8_t TRK_DEF[NPART][3] = {{ENGI_GLITCH, 18, 0}, {ENGI_GLITCH, 23, 0}, {ENGI_GLITCH, 22, 0}, {ENGI_DRUM, 1, 0}};
 #else                                                                  /* Felucca's: ANALOG ACID, FM6 PAD, LOFI PULSE LD, */
 static const uint8_t TRK_DEF[NPART][3] = {{0, 4, 0}, {ENGI_FM6, 4, 0}, {3, 0, 0}, {ENGI_DRUM, 0, 0}};   /* DRUM KIT */
 #endif

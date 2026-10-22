@@ -248,10 +248,10 @@ static void destroy_kit(void)
     for (k = 0; k < NVOICE; k++)
         busy += trk[0].v[k].active;
     check("  .. every voice free 3 s after the last hit", !busy);
-    check("power-on (GLITCHBOX_DEFAULTS): T1 GLITCH DESTROYER, T2 FUZZ BASS, T3 HUM, T4 DRUM DESTROY, sequencers empty",
-          GLITCHBOX_DEFAULTS && TRK_DEF[0][0] == 7u && str_eq(ENG_GLITCH.presets[TRK_DEF[0][1]].name, "DESTROYER") &&
-          TRK_DEF[1][0] == 7u && str_eq(ENG_GLITCH.presets[TRK_DEF[1][1]].name, "FUZZ BASS") &&
-          TRK_DEF[2][0] == 7u && str_eq(ENG_GLITCH.presets[TRK_DEF[2][1]].name, "HUM") &&
+    check("power-on (GLITCHBOX_DEFAULTS): T1 CODEC ROT, T2 BIT ROT BASS, T3 UNDERRUN, T4 DRUM DESTROY, sequencers empty",
+          GLITCHBOX_DEFAULTS && TRK_DEF[0][0] == 7u && str_eq(ENG_GLITCH.presets[TRK_DEF[0][1]].name, "CODEC ROT") &&
+          TRK_DEF[1][0] == 7u && str_eq(ENG_GLITCH.presets[TRK_DEF[1][1]].name, "BIT ROT BASS") &&
+          TRK_DEF[2][0] == 7u && str_eq(ENG_GLITCH.presets[TRK_DEF[2][1]].name, "UNDERRUN") &&
           TRK_DEF[3][0] == ENGI_DRUM && str_eq(ENG_DRUM.presets[TRK_DEF[3][1]].name, "DESTROY") &&
           !TRK_DEF[0][2] && !TRK_DEF[1][2] && !TRK_DEF[2][2] && !TRK_DEF[3][2]);
     check("PATTERNS[13] is DESTROY and DRUM's preset 1 is DESTROY (KIT DSTR, PAT 14)",
@@ -408,12 +408,15 @@ static FILE *demo_open(const char *dir, const char *name)
         wav_hdr(w, 0);
     return w;
 }
+static int32_t demo_peak;                            /* the largest |sample| the demos wrote (EHL damage checks) */
 static uint32_t demo_blocks(FILE *w, uint32_t nb)
 {
     static int32_t o[2 * CTL];
     uint32_t i, j;
     for (i = 0; i < nb; i++) {
         mix_block(o, CTL);
+        for (j = 0; j < 2u * CTL; j++)
+            demo_peak = abs(o[j]) > demo_peak ? abs(o[j]) : demo_peak;
         for (j = 0; j < CTL; j++)
             wav_put(w, o[2 * j], o[2 * j + 1]);
     }
@@ -516,8 +519,56 @@ static void demos(const char *dir)
             demo_close(w, frames);
         }
     }
-    printf("glitch: demos in %s: %u GLITCH presets, destroy_kit, jam, jam_fx_* (ROLL GATE CRSH SWP RANDOM)\n", dir,
-           (uint32_t)ENG_GLITCH.npresets);
+    {   /* EHL damage: the jam with each damage FX held through bars 3 and 4; afterwards the layer falls idle again */
+        static const uint8_t E[4] = {PF_WRAP, PF_BFLP, PF_UNDR, PF_ADPC};
+        static const char *const N[4] = {"jam_fx_wrap", "jam_fx_bitflip", "jam_fx_underrun", "jam_fx_adpcm"};
+        uint32_t k, idle = 1;
+        demo_peak = 0;
+        for (k = 0; k < 4u; k++) {
+            uint32_t pat[NPART] = {14u, 4u, 8u, 0};
+            if (!(w = demo_open(dir, N[k])))
+                return;
+            memset(trk, 0, sizeof trk);
+            host_tracks_init();
+            host_preset(&trk[0], ENGI_DRUM, 1);
+            host_preset(&trk[1], eng_of(&ENG_GLITCH), preset_of(&ENG_GLITCH, "DESTROYER"));
+            host_preset(&trk[2], eng_of(&ENG_GLITCH), preset_of(&ENG_GLITCH, "HUM"));
+            trk[2].p[P_LEVEL] = 80;
+            song.g[G_BPM] = 110;
+            perf_held = 0;
+            frames = play(w, pat, 2, 110);
+            perf_press(E[k], 1);
+            frames += play(w, pat, 2, 110);
+            perf_press(E[k], 0);
+            frames += play(w, pat, 1, 110);
+            idle &= !pf.ww && !pf.bw && !pf.aw && !pf.ulen;
+            demo_close(w, frames);
+        }
+        check("EHL FX: WRAP BITFLIP UNDERRUN ADPCM on the jam stay within full scale, and let go fall idle",
+              demo_peak <= 32768 && idle);
+    }
+    {   /* EHL damage: the new presets in the jam's place of DESTROYER */
+        static const char *const P[6] = {"CODEC ROT", "OVERFLOW", "MISREAD", "SHEARED", "UNDERRUN", "BIT ROT BASS"};
+        uint32_t k;
+        demo_peak = 0;
+        for (k = 0; k < 6u; k++) {
+            uint32_t pat[NPART] = {14u, 4u, 0, 0};
+            snprintf(nm, sizeof nm, "jam_ins_%s", P[k]);
+            for (i = 8; nm[i]; i++)
+                nm[i] = nm[i] == ' ' ? '_' : nm[i];
+            if (!(w = demo_open(dir, nm)))
+                return;
+            memset(trk, 0, sizeof trk);
+            host_tracks_init();
+            host_preset(&trk[0], ENGI_DRUM, 1);
+            host_preset(&trk[1], eng_of(&ENG_GLITCH), preset_of(&ENG_GLITCH, P[k]));
+            pat[1] = ENG_GLITCH.presets[preset_of(&ENG_GLITCH, P[k])].pat;
+            demo_close(w, play(w, pat, 4, 110));
+        }
+        check("EHL presets: CODEC ROT .. BIT ROT BASS over the DESTROY beat stay within full scale", demo_peak <= 32768);
+    }
+    printf("glitch: demos in %s: %u GLITCH presets, destroy_kit, jam, jam_fx_* (ROLL GATE CRSH SWP RANDOM WRAP BITFLIP "
+           "UNDERRUN ADPCM), jam_ins_* (EHL damage)\n", dir, (uint32_t)ENG_GLITCH.npresets);
 }
 
 int main(int argc, char **argv)
