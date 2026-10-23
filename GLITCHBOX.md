@@ -110,6 +110,13 @@ the way a broken codec, a fixed-point chip or an audio driver breaks it.
 KNOB 2 (CRUSH) with FX makes BITFLIP, UNDERRUN and ADPCM's errors denser. OCT UP, OCT DN, FLANGER and ECHO THROW left
 the default map; hold a key in the FX layer and turn PRESETS to put them back.
 
+### The second core
+
+This fork is merged up to Felucca 1.6.1. Turn **MENU > SYSTEM > 2ND CORE ON** (BETA upstream; takes effect from the
+next power-on): on the FM-1 it removes the voice dropouts that heavy INSERTs and FX keys caused with one core
+([docs/EHL-CPU.md](docs/EHL-CPU.md)). Felucca 1.5.6's DEEP, TIGHT and PERC kits came with the merge; KIT DSTR is now the
+last kit and DRUM > DESTROY the fifth DRUM preset.
+
 ### Presets and power-on
 
 New GLCH presets: CODEC ROT, OVERFLOW, MISREAD, SHEARED, UNDERRUN and BIT ROT BASS, each with its damage INSERT.

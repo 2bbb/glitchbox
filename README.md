@@ -9,8 +9,9 @@ beautiful sounds and more about taming a beast.
 
 > **This fork (2bbb/glitchbox) adds EHL damage:** five INSERT types (ADPCM, OVRFL, MISRD, SHEAR, UNDRN) and four
 > FX keys (WRAP, BITFLIP, UNDERRUN, ADPCM) that break the sound like a broken codec, fixed-point chip or audio
-> driver. See [GLITCHBOX.md](GLITCHBOX.md#ehl-damage-this-fork-v151-ehl1). Built and flashed on a real FM-1
-> (2026-10-23); its sound on the device has not been checked by ear yet.
+> driver, and is merged up to Felucca 1.6.1 for its second CPU core (v1.6.1-ehl3). See
+> [GLITCHBOX.md](GLITCHBOX.md#ehl-damage-this-fork-v151-ehl1) and [docs/EHL-CPU.md](docs/EHL-CPU.md): on a real FM-1
+> with MENU > SYSTEM > 2ND CORE ON, the heaviest EHL settings run without dropping voices.
 
 Glitchbox is a fork of [Felucca](https://github.com/hugelton/Felucca) v1.5.1 by Hügelton Instruments. Everything
 Felucca does still works; Glitchbox adds a new engine, a drum kit, live effects and dirtier defaults.
