@@ -149,7 +149,8 @@ def main():
         rows.append(s)
         print(f"{name:28s} cpu {s.get('cpu_pct', -1):3d} %  peak {s.get('audio_max_us', -1):5d} us "
               f"({s['max_pct']:5.1f} %)  late {s.get('audio_late', -1):3d}  shed {s.get('voices_shed', -1):3d}  "
-              f"given up {s.get('voices_given_up', -1):3d}", flush=True)
+              f"given up {s.get('voices_given_up', -1):3d}  cpu2 {s.get('cpu2', '-')} "
+              f"({s.get('cpu2_blocks', 0)} blocks, wait max {s.get('cpu2_wait_max_us', 0)} us)", flush=True)
         time.sleep(1.0)
     con.cmd("fxl 0")
     con.cmd("ins 0 0")

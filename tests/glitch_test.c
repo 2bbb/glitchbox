@@ -254,9 +254,9 @@ static void destroy_kit(void)
           TRK_DEF[2][0] == 7u && str_eq(ENG_GLITCH.presets[TRK_DEF[2][1]].name, "UNDERRUN") &&
           TRK_DEF[3][0] == ENGI_DRUM && str_eq(ENG_DRUM.presets[TRK_DEF[3][1]].name, "DESTROY") &&
           !TRK_DEF[0][2] && !TRK_DEF[1][2] && !TRK_DEF[2][2] && !TRK_DEF[3][2]);
-    check("PATTERNS[13] is DESTROY and DRUM's preset 1 is DESTROY (KIT DSTR, PAT 14)",
-          str_eq(PATTERNS[13].name, "DESTROY") && ENG_DRUM.npresets > 1u && str_eq(ENG_DRUM.presets[1].name, "DESTROY") &&
-          ENG_DRUM.presets[1].e[0] == DK_DSTR && ENG_DRUM.presets[1].pat == 14u);
+    check("PATTERNS[13] is DESTROY and DRUM's preset 4 is DESTROY (KIT DSTR, PAT 14; after 1.5.6's DEEP TIGHT PERC)",
+          str_eq(PATTERNS[13].name, "DESTROY") && ENG_DRUM.npresets > 4u && str_eq(ENG_DRUM.presets[4].name, "DESTROY") &&
+          ENG_DRUM.presets[4].e[0] == DK_DSTR && ENG_DRUM.presets[4].pat == 14u);
 }
 
 /* ------------------------------------------------------------ FX layer --- */
@@ -481,14 +481,14 @@ static void demos(const char *dir)
         uint32_t pat[NPART] = {14u, 0, 0, 0};
         memset(trk, 0, sizeof trk);
         host_tracks_init();
-        host_preset(&trk[0], ENGI_DRUM, 1);
+        host_preset(&trk[0], ENGI_DRUM, preset_of(&ENG_DRUM, "DESTROY"));
         demo_close(w, play(w, pat, 4, 110));
     }
     if ((w = demo_open(dir, "jam"))) {                /* DESTROY beat + DESTROYER line + HUM drone */
         uint32_t pat[NPART] = {14u, 4u, 8u, 0};
         memset(trk, 0, sizeof trk);
         host_tracks_init();
-        host_preset(&trk[0], ENGI_DRUM, 1);
+        host_preset(&trk[0], ENGI_DRUM, preset_of(&ENG_DRUM, "DESTROY"));
         host_preset(&trk[1], eng_of(&ENG_GLITCH), preset_of(&ENG_GLITCH, "DESTROYER"));
         host_preset(&trk[2], eng_of(&ENG_GLITCH), preset_of(&ENG_GLITCH, "HUM"));
         trk[2].p[P_LEVEL] = 80;
@@ -505,7 +505,7 @@ static void demos(const char *dir)
                 return;
             memset(trk, 0, sizeof trk);
             host_tracks_init();
-            host_preset(&trk[0], ENGI_DRUM, 1);
+            host_preset(&trk[0], ENGI_DRUM, preset_of(&ENG_DRUM, "DESTROY"));
             host_preset(&trk[1], eng_of(&ENG_GLITCH), preset_of(&ENG_GLITCH, "DESTROYER"));
             host_preset(&trk[2], eng_of(&ENG_GLITCH), preset_of(&ENG_GLITCH, "HUM"));
             trk[2].p[P_LEVEL] = 80;
@@ -530,7 +530,7 @@ static void demos(const char *dir)
                 return;
             memset(trk, 0, sizeof trk);
             host_tracks_init();
-            host_preset(&trk[0], ENGI_DRUM, 1);
+            host_preset(&trk[0], ENGI_DRUM, preset_of(&ENG_DRUM, "DESTROY"));
             host_preset(&trk[1], eng_of(&ENG_GLITCH), preset_of(&ENG_GLITCH, "DESTROYER"));
             host_preset(&trk[2], eng_of(&ENG_GLITCH), preset_of(&ENG_GLITCH, "HUM"));
             trk[2].p[P_LEVEL] = 80;
@@ -560,7 +560,7 @@ static void demos(const char *dir)
                 return;
             memset(trk, 0, sizeof trk);
             host_tracks_init();
-            host_preset(&trk[0], ENGI_DRUM, 1);
+            host_preset(&trk[0], ENGI_DRUM, preset_of(&ENG_DRUM, "DESTROY"));
             host_preset(&trk[1], eng_of(&ENG_GLITCH), preset_of(&ENG_GLITCH, P[k]));
             pat[1] = ENG_GLITCH.presets[preset_of(&ENG_GLITCH, P[k])].pat;
             demo_close(w, play(w, pat, 4, 110));

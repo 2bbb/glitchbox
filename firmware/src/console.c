@@ -200,6 +200,15 @@ static void con_status(void)
     con_kv("audio_max_us", (int32_t)felucca_dbg.max_us);
     con_kv("audio_late", (int32_t)felucca_dbg.late);
     con_kv("voices_shed", (int32_t)shed_count);
+#if FELUCCA_CPU2
+    con_kv("cpu2_set", (ui_prefs2 & (PREF_CPU2_ON >> 16)) != 0u);   /* MENU > 2ND CORE: 1 ON (from power-on), 0 OFF */
+    con_kv("cpu2", fm1_c1_on);                          /* the second core renders parts (hal/fm1_cpu1.h) */
+    con_kv("cpu2_gave_up", fm1_c1_gave_up);             /* 1: it misread a job, 2: one timed out (then one core) */
+    con_kv("cpu2_bad", (int32_t)fm1_c1_mb.bad);
+    con_kv("cpu2_blocks", (int32_t)c1_blocks);          /* blocks it took parts of (fx.c mix_block) */
+    con_kv("cpu2_wait_max_us", (int32_t)(fm1_c1_wait_max / 24u));
+    con_kv("cpu2_stack", (int32_t)fm1_cpu1_stack_used());
+#endif
     con_kv("voices_given_up", (int32_t)voice_kills);
     con_kv("track", (int32_t)song.sel + 1);
     con_kv("batt_raw", song.batt_raw);
@@ -346,7 +355,8 @@ static void con_params(void)
  *   ins T TYPE [MIX]   track T (1..4, 0 = all) INSERT TYPE (fx.c IT_*, 0 OFF .. 16 UNDRN), MIX (default 127)
  *   set T P V          track T's parameter P (params.c P_*: `params` lists the selected track's) to V
  *   fxl MASK           the FX layer's latched effects (perform.c PF_* bits), 0 = none
- *   maxreset           zero the peaks and counters status reports */
+ *   maxreset           zero the peaks and counters status reports
+ *   cpu2 0|1           MENU > SYSTEM > 2ND CORE OFF / ON (BETA), saved; it takes effect from the next power-on */
 static int con_track(const char **p, uint32_t *lo, uint32_t *hi)
 {
     int ok;
@@ -406,6 +416,19 @@ static void con_maxreset(void)
     voice_kills = 0;
     con_puts("ok\r\n");
 }
+#if FELUCCA_CPU2
+static void con_cpu2(const char *p)
+{
+    int ok;
+    uint32_t v = con_num(&p, &ok);
+    if (ok) {
+        menu_put(MI_CPU2, v ? 1u : 0u);
+        settings_save();
+    }
+    con_kv("cpu2_set", (ui_prefs2 & (PREF_CPU2_ON >> 16)) != 0u);
+    con_kv("cpu2", fm1_c1_on);
+}
+#endif
 #endif
 
 static void con_exec(const char *p)
@@ -433,6 +456,10 @@ static void con_exec(const char *p)
         con_fxl(p);
     else if (con_word(&p, "maxreset"))
         con_maxreset();
+#if FELUCCA_CPU2
+    else if (con_word(&p, "cpu2"))
+        con_cpu2(p);
+#endif
 #endif
 #if FELUCCA_FLASH
     else if (con_word(&p, "flr"))
