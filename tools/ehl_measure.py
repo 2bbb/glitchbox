@@ -130,7 +130,26 @@ def main():
     if "? (help)" in con.cmd("maxreset"):
         raise SystemExit("not an EHL_MEASURE=1 build (no maxreset)")
     out = mido.open_output(find_port(mido.get_output_names(), ["FM-1", "Felucca", "Glitchbox", "FM1"]))
+    # each track's INSERT as it is: put back at the end (the firmware autosaves the music and restores it at power-on,
+    # so a measurement must not leave its settings behind)
+    saved = re.findall(r"^ins (\d) (-?\d+) (-?\d+)\r?$", con.cmd("ins 0"), re.M)
+    if len(saved) != 4:
+        raise SystemExit("cannot read the INSERTs back (an older EHL_MEASURE build?): not measuring")
     rows = []
+    try:
+        run(con, out, a, rows)
+    finally:
+        notes_off(out)
+        con.cmd("fxl 0")
+        for k, ty, mix in saved:
+            con.cmd(f"ins {k} {ty} {mix}")
+        print("restored the INSERTs: " + ", ".join(f"T{k} {ty}/{mix}" for k, ty, mix in saved))
+    if a.json:
+        with open(a.json, "w") as f:
+            json.dump(rows, f, indent=1)
+
+
+def run(con, out, a, rows):
     for name, types, fx, notes in (FX_SCENARIOS if a.set == "fx" else SCENARIOS):
         if types:
             for k, ty in enumerate(types):
@@ -152,11 +171,6 @@ def main():
               f"given up {s.get('voices_given_up', -1):3d}  cpu2 {s.get('cpu2', '-')} "
               f"({s.get('cpu2_blocks', 0)} blocks, wait max {s.get('cpu2_wait_max_us', 0)} us)", flush=True)
         time.sleep(1.0)
-    con.cmd("fxl 0")
-    con.cmd("ins 0 0")
-    if a.json:
-        with open(a.json, "w") as f:
-            json.dump(rows, f, indent=1)
 
 
 if __name__ == "__main__":

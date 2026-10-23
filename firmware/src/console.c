@@ -352,7 +352,8 @@ static void con_params(void)
 
 #if EHL_MEASURE
 /* EHL measurement build (EHL_MEASURE=1 ./build.sh): set up a load from the console and read the audio ISR's peaks.
- *   ins T TYPE [MIX]   track T (1..4, 0 = all) INSERT TYPE (fx.c IT_*, 0 OFF .. 16 UNDRN), MIX (default 127)
+ *   ins T TYPE [MIX]   track T (1..4, 0 = all) INSERT TYPE (fx.c IT_*, 0 OFF .. 16 UNDRN), MIX (default 127);
+ *   ins T              without TYPE: print "ins T TYPE MIX" for each track (tools/ehl_measure.py restores them)
  *   set T P V          track T's parameter P (params.c P_*: `params` lists the selected track's) to V
  *   fxl MASK           the FX layer's latched effects (perform.c PF_* bits), 0 = none
  *   maxreset           zero the peaks and counters status reports
@@ -371,7 +372,24 @@ static void con_ins(const char *p)
 {
     int ok, okm;
     uint32_t lo, hi, ty, m, k;
-    if (!con_track(&p, &lo, &hi) || (ty = con_num(&p, &ok), !ok) || ty >= IT_N) {
+    if (!con_track(&p, &lo, &hi)) {
+        con_puts("usage: ins T(0..4) [TYPE(0..16) [MIX]]\r\n");
+        return;
+    }
+    ty = con_num(&p, &ok);
+    if (!ok) {                                          /* read back */
+        for (k = lo; k < hi; k++) {
+            con_puts("ins ");
+            con_dec((int32_t)k + 1);
+            con_putc(' ');
+            con_dec(trk[k].p[P_ITYPE]);
+            con_putc(' ');
+            con_dec(trk[k].p[P_IMIX]);
+            con_puts("\r\n");
+        }
+        return;
+    }
+    if (ty >= IT_N) {
         con_puts("usage: ins T(0..4) TYPE(0..16) [MIX]\r\n");
         return;
     }
