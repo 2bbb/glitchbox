@@ -13,6 +13,9 @@
 #define NTRK NPART               /* tracks (the formats and the protocol count these): every track is a part */
 #define NSTEP 64
 #define HALF_FRAMES 128          /* I2S half buffer: 2.9 ms at 44.1 kHz (a key waits 0..1 half, then plays 1 half later) */
+#ifndef EHL_MEASURE
+#define EHL_MEASURE 0            /* 1: the console's load and peak commands (console.c), for CPU measurement builds */
+#endif
 #ifndef FELUCCA_SLICE
 #define FELUCCA_SLICE 1          /* the SLICE engine (eng_slice.c), engine 13; FELUCCA_SLICE=0 builds without it */
 #endif

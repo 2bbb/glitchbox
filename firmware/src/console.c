@@ -341,6 +341,73 @@ static void con_params(void)
     }
 }
 
+#if EHL_MEASURE
+/* EHL measurement build (EHL_MEASURE=1 ./build.sh): set up a load from the console and read the audio ISR's peaks.
+ *   ins T TYPE [MIX]   track T (1..4, 0 = all) INSERT TYPE (fx.c IT_*, 0 OFF .. 16 UNDRN), MIX (default 127)
+ *   set T P V          track T's parameter P (params.c P_*: `params` lists the selected track's) to V
+ *   fxl MASK           the FX layer's latched effects (perform.c PF_* bits), 0 = none
+ *   maxreset           zero the peaks and counters status reports */
+static int con_track(const char **p, uint32_t *lo, uint32_t *hi)
+{
+    int ok;
+    uint32_t t = con_num(p, &ok);
+    if (!ok || t > NTRK)
+        return 0;
+    *lo = t ? t - 1u : 0u;
+    *hi = t ? t : NTRK;
+    return 1;
+}
+static void con_ins(const char *p)
+{
+    int ok, okm;
+    uint32_t lo, hi, ty, m, k;
+    if (!con_track(&p, &lo, &hi) || (ty = con_num(&p, &ok), !ok) || ty >= IT_N) {
+        con_puts("usage: ins T(0..4) TYPE(0..16) [MIX]\r\n");
+        return;
+    }
+    m = con_num(&p, &okm);
+    for (k = lo; k < hi; k++) {
+        trk[k].p[P_ITYPE] = (int16_t)ty;
+        trk[k].p[P_IMIX] = (int16_t)(okm ? clamp((int32_t)m, 0, 127) : 127);
+    }
+    con_puts("ok\r\n");
+}
+static void con_set(const char *p)
+{
+    int ok, okv;
+    uint32_t lo, hi, k, i = 0;
+    int32_t v;
+    if (con_track(&p, &lo, &hi))
+        i = con_num(&p, &ok);
+    else
+        ok = 0;
+    v = (int32_t)con_num(&p, &okv);
+    if (!ok || !okv || i >= P_COUNT) {
+        con_puts("usage: set T(0..4) P V\r\n");
+        return;
+    }
+    for (k = lo; k < hi; k++)
+        trk[k].p[i] = (int16_t)v;
+    con_puts("ok\r\n");
+}
+static void con_fxl(const char *p)
+{
+    int ok;
+    uint32_t m = con_num(&p, &ok);
+    perf_latched = ok ? m & ((1u << PF_NFX) - 1u) : 0u;
+    con_kx("fx_latched", perf_latched);
+}
+static void con_maxreset(void)
+{
+    felucca_dbg.max_us = 0;
+    felucca_dbg.late = 0;
+    audio_max_us = 0;
+    shed_count = 0;
+    voice_kills = 0;
+    con_puts("ok\r\n");
+}
+#endif
+
 static void con_exec(const char *p)
 {
     if (con_word(&p, "help") || con_word(&p, "?"))
@@ -357,6 +424,16 @@ static void con_exec(const char *p)
         con_params();
     else if (con_word(&p, "memr"))
         con_memr(p);
+#if EHL_MEASURE
+    else if (con_word(&p, "ins"))
+        con_ins(p);
+    else if (con_word(&p, "set"))
+        con_set(p);
+    else if (con_word(&p, "fxl"))
+        con_fxl(p);
+    else if (con_word(&p, "maxreset"))
+        con_maxreset();
+#endif
 #if FELUCCA_FLASH
     else if (con_word(&p, "flr"))
         con_flr(p);
