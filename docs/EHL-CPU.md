@@ -1,4 +1,4 @@
-# EHL damage: CPU on the FM-1 (2026-10-23, 2026-10-24)
+# EHL damage: CPU on the FM-1 (2026-10-23)
 
 Measured on a real FM-1 with an `EHL_MEASURE=1` build and `tools/ehl_measure.py`. The script plays re-struck chords on
 MIDI channels 1-3 (8 notes each, more than the 8 shared voices) and a drum pattern on channel 4, then reads the
