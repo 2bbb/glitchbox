@@ -571,6 +571,47 @@ static void demos(const char *dir)
            "UNDERRUN ADPCM), jam_ins_* (EHL damage)\n", dir, (uint32_t)ENG_GLITCH.npresets);
 }
 
+/* EHL damage at MASTER 0: the FX layer runs after the MASTER level, and BITFLIP / ADPCM make sound from silence; what
+ * they add follows MASTER (perform.c dmg_master), so MASTER 0 with all four latched over a playing note is silent.
+ * (master_out's ~2 Hz DC blocker lets the level from before MASTER 0 fall over seconds: not zero samples, but no
+ * sound. The check is on what is heard: the largest step between samples after 50 ms) */
+static int32_t ehl_master0_step(uint32_t latched)
+{
+    static int32_t o[2 * CTL];
+    uint32_t i, j, m0 = song.master_q12;
+    int32_t pl = 0, pr = 0, step = 0;
+    memset(trk, 0, sizeof trk);
+    host_tracks_init();
+    host_preset(&trk[1], eng_of(&ENG_GLITCH), preset_of(&ENG_GLITCH, "DESTROYER"));
+    trk_note_on(&trk[1], 48, 110);
+    song.master_q12 = 0;
+    perf_latched = latched;
+    for (i = 0; i < FS / CTL; i++) {
+        mix_block(o, CTL);
+        for (j = 0; j < CTL; j++) {
+            int32_t dl = abs(o[2 * j] - pl), dr = abs(o[2 * j + 1] - pr);
+            if (i >= FS / 20u / CTL)
+                step = dl > step ? dl : dr > step ? dr : step;
+            pl = o[2 * j];
+            pr = o[2 * j + 1];
+        }
+    }
+    perf_latched = 0;
+    song.master_q12 = m0;
+    for (i = 0; i < FS / 4u / CTL; i++)
+        mix_block(o, CTL);
+    trk_note_off(&trk[1], 48);
+    return step;
+}
+static void ehl_master0(void)
+{
+    int32_t base = ehl_master0_step(0), dmg = ehl_master0_step(PF_DMG);
+    printf("glitch:   MASTER 0, a note held: largest sample step %d without the FX layer, %d with WRAP BITFLIP UNDERRUN "
+           "ADPCM latched\n", base, dmg);
+    check("EHL FX: MASTER 0 with WRAP BITFLIP UNDERRUN ADPCM latched adds no sound (steps no larger than without them)",
+          dmg <= base);
+}
+
 int main(int argc, char **argv)
 {
     stutter();
@@ -580,6 +621,7 @@ int main(int argc, char **argv)
     release();
     destroy_kit();
     fx_layer();
+    ehl_master0();
     if (!getenv("NOCOST"))
         cost();
     if (argc > 1)

@@ -1043,6 +1043,7 @@ static __attribute__((noinline)) void perf_master(int32_t *out, uint32_t n)
         mix_l[i] = (((mix_l[i] + wet[i]) >> 2) * mg) >> 10;
         mix_r[i] = (((mix_r[i] + wet[i]) >> 2) * mg) >> 10;
     }
+    pf_mg = mg;                                         /* (EHL damage: what it adds follows MASTER too) */
     perf_block(mix_l, mix_r, n);
     for (i = 0; i < n; i++) {
         int32_t l = mix_l[i], r = mix_r[i];

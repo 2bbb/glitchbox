@@ -99,11 +99,25 @@ SCENARIOS = [
 ]
 
 
+FX_SCENARIOS = [
+    ("mixed EHL, no FX", ["ADPCM", "OVRFL", "MISRD", "UNDRN"], 0, 8),
+    ("mixed EHL + GATE (stock)", ["ADPCM", "OVRFL", "MISRD", "UNDRN"], 1 << 15, 8),
+    ("mixed EHL + REPEAT 1/16 (stock)", ["ADPCM", "OVRFL", "MISRD", "UNDRN"], 1 << 1, 8),
+    ("mixed EHL + WRAP", ["ADPCM", "OVRFL", "MISRD", "UNDRN"], 1 << 18, 8),
+    ("mixed EHL + BITFLIP", ["ADPCM", "OVRFL", "MISRD", "UNDRN"], 1 << 19, 8),
+    ("mixed EHL + UNDERRUN", ["ADPCM", "OVRFL", "MISRD", "UNDRN"], 1 << 20, 8),
+    ("mixed EHL + ADPCM FX", ["ADPCM", "OVRFL", "MISRD", "UNDRN"], 1 << 21, 8),
+    ("INSERTs OFF + 4 damage FX", ["OFF"] * 4, PF_DAMAGE, 8),
+    ("mixed EHL + 4 damage FX", ["ADPCM", "OVRFL", "MISRD", "UNDRN"], PF_DAMAGE, 8),
+]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--serial", help="the console's device (default: the first /dev/cu.usbmodem*)")
     ap.add_argument("--seconds", type=float, default=8.0)
     ap.add_argument("--json")
+    ap.add_argument("--set", choices=["inserts", "fx"], default="inserts", help="the scenario table")
     a = ap.parse_args()
     dev = a.serial or (sorted(glob.glob("/dev/cu.usbmodem*")) or [None])[0]
     if not dev:
@@ -117,7 +131,7 @@ def main():
         raise SystemExit("not an EHL_MEASURE=1 build (no maxreset)")
     out = mido.open_output(find_port(mido.get_output_names(), ["FM-1", "Felucca", "Glitchbox", "FM1"]))
     rows = []
-    for name, types, fx, notes in SCENARIOS:
+    for name, types, fx, notes in (FX_SCENARIOS if a.set == "fx" else SCENARIOS):
         if types:
             for k, ty in enumerate(types):
                 con.cmd(f"ins {k + 1} {IT[ty]}")

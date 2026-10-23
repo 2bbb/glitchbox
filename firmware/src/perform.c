@@ -798,10 +798,14 @@ static __attribute__((noinline)) void perf_phaser(int32_t *bl, int32_t *br, uint
     }
 }
 
-/* EHL damage, a sample (perf_block, after GATE): WRAP, BITFLIP, ADPCM, each faded in and out by its share */
-static __attribute__((noinline)) void perf_damage(uint32_t a, int32_t *pl, int32_t *pr)
+/* EHL damage, a sample (perf_block, after GATE): WRAP, BITFLIP, ADPCM, each faded in and out by its share.
+ * The FX layer runs after the MASTER level (fx.c perf_master), so what BITFLIP and ADPCM add from nothing (a bit set
+ * in a silent word, a drifting decoder) is scaled by MASTER too (pf_mg): MASTER 0 is silence, a low MASTER is quiet */
+static int32_t pf_mg = 4096;                   /* fx.c perf_master: the MASTER gain of this block, Q12 */
+static inline int32_t dmg_master(int32_t x, int32_t y) { return x + (((y - x) >> 2) * pf_mg >> 10); }   /* (|y - x| < 2^18: 32 bits) */
+static inline void perf_damage(uint32_t a, int32_t *pl, int32_t *pr, int32_t deep)
 {
-    int32_t l = *pl, r = *pr, deep = perf_k[1] > 0 ? perf_k[1] : 0;   /* KNOB 2: deeper errors */
+    int32_t l = *pl, r = *pr;
     pf.ww += clamp((a & PF_BIT(PF_WRAP) ? 32768 : 0) - pf.ww, -SL_SLOPE, SL_SLOPE);
     pf.bw += clamp((a & PF_BIT(PF_BFLP) ? 32768 : 0) - pf.bw, -SL_SLOPE, SL_SLOPE);
     pf.aw += clamp((a & PF_BIT(PF_ADPC) ? 32768 : 0) - pf.aw, -SL_SLOPE, SL_SLOPE);
@@ -818,8 +822,8 @@ static __attribute__((noinline)) void perf_damage(uint32_t a, int32_t *pl, int32
             yl = (int16_t)((uint32_t)yl ^ (q & 0x100000u ? 0x8000u : 1u << (9u + (q >> 8) % 6u)));
         if (!((q >> 4) & every))
             yr = (int16_t)((uint32_t)yr ^ (q & 0x200000u ? 0x8000u : 1u << (9u + (q >> 12) % 6u)));
-        l = pf_mix(l, yl, pf.bw);
-        r = pf_mix(r, yr, pf.bw);
+        l = pf_mix(l, dmg_master(l, yl), pf.bw);
+        r = pf_mix(r, dmg_master(r, yr), pf.bw);
     }
     if (pf.aw) {                                    /* 3-bit ADPCM, a code every 2 samples, the index knocked */
         if (!(pf.an++ & 1u)) {
@@ -830,13 +834,22 @@ static __attribute__((noinline)) void perf_damage(uint32_t a, int32_t *pl, int32
             if ((q & 0x1FFu) < 3u + (uint32_t)deep)    /* every few ms: a channel's step index knocked */
                 pf.ai[q >> 31] = clamp(pf.ai[q >> 31] + (int32_t)((q >> 9) & 31u) - 15, 0, 88);
         }
-        l = pf_mix(l, pf.ah[0], pf.aw);
-        r = pf_mix(r, pf.ah[1], pf.aw);
+        l = pf_mix(l, dmg_master(l, pf.ah[0]), pf.aw);
+        r = pf_mix(r, dmg_master(r, pf.ah[1]), pf.aw);
     } else {
         pf.ap[0] = pf.ap[1] = pf.ai[0] = pf.ai[1] = 0;
     }
     *pl = l;
     *pr = r;
+}
+/* .. over a block (perf_block, after its sample loop and before FLANGER: the same place in the chain as a last step
+ * of that loop; a loop of its own keeps the per-sample call out of the hot path) */
+static __attribute__((noinline)) void perf_damage_block(int32_t *bl, int32_t *br, uint32_t n)
+{
+    uint32_t i;
+    int32_t deep = perf_k[1] > 0 ? perf_k[1] : 0;     /* KNOB 2: deeper errors */
+    for (i = 0; i < n; i++)
+        perf_damage(i < pf.split ? pf.act0 : pf.act, &bl[i], &br[i], deep);
 }
 
 /* EHL damage: UNDERRUN, a block (perf_block, at its end): late blocks repeat the one before or go silent */
@@ -928,11 +941,11 @@ static __attribute__((noinline)) void perf_block(int32_t *bl, int32_t *br, uint3
         }
         if (++gp >= gq)
             gp = 0;
-        if ((a & PF_DMG) || pf.ww || pf.bw || pf.aw)
-            perf_damage(a, &l, &r);
         bl[i] = l;
         br[i] = r;
     }
+    if (((pf.act0 | pf.act) & PF_DMG) || pf.ww || pf.bw || pf.aw)
+        perf_damage_block(bl, br, n);
     if ((pf.act & PF_BIT(PF_UNDR)) || pf.ulen)
         perf_underrun(bl, br, n);
     if ((pf.act & PF_BIT(PF_FLG)) || pf.fw || pf.fn)
